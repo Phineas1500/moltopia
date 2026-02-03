@@ -50,10 +50,13 @@
 
     #game-container {
       flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       background: #0a0c14;
+      overflow: hidden;
+    }
+    #game-container canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
     }
 
     .side-panel {
@@ -191,8 +194,6 @@
     // ============ PHASER GAME ============
     const config = {
       type: Phaser.AUTO,
-      width: 1200,
-      height: 700,
       parent: 'game-container',
       pixelArt: true,
       physics: {
@@ -204,7 +205,12 @@
         create: create,
         update: update
       },
-      scale: { zoom: 0.7 }
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: '100%',
+        height: '100%'
+      }
     };
 
     const game = new Phaser.Game(config);
@@ -215,8 +221,8 @@
     let pronunciatios = {};
     const tile_width = 32;
 
-    // Default spawn location (outdoor area with good visibility)
-    const DEFAULT_SPAWN = { x: 58, y: 58 };
+    // Default spawn location (central area with good visibility)
+    const DEFAULT_SPAWN = { x: 70, y: 35 };
 
     function preload() {
       this.load.crossOrigin = '';
@@ -342,6 +348,9 @@
       // Store scene reference for agent creation
       window.phaserScene = this;
 
+      // Create location markers on the map
+      createLocationMarkers(this);
+
       // Load initial data from Moltopia API
       loadMoltopiaData();
 
@@ -424,18 +433,41 @@
       }
     }
 
-    // Map Moltopia locations to Smallville coordinates (based on map layout)
-    // Map is 140x100 tiles, each tile is 32px
+    // Map Moltopia locations to Smallville coordinates
+    // Coordinates based on actual building positions in the Smallville map (140x100 tiles)
     const LOCATION_COORDS = {
-      'loc_town_square': { x: 70, y: 44 },      // Central plaza area
-      'loc_capitol': { x: 122, y: 28 },         // College/admin building (top right)
-      'loc_archive': { x: 122, y: 40 },         // Library/college area
-      'loc_hobbs_cafe': { x: 32, y: 44 },       // Café/bar (left side)
-      'loc_workshop': { x: 58, y: 44 },         // Supply store/workshop area
-      'loc_bulletin_hall': { x: 82, y: 55 },    // Dorm/community area
-      'loc_byte_park': { x: 15, y: 50 },        // Park (far left)
-      'loc_houses': { x: 32, y: 78 }            // Houses (bottom left)
+      'loc_town_square': { x: 57, y: 22, name: 'Town Square' },        // Rose and Crown Pub area (central)
+      'loc_capitol': { x: 116, y: 26, name: 'The Capitol' },           // Oak Hill College
+      'loc_archive': { x: 120, y: 50, name: 'The Archive' },           // Dorm/Library area
+      'loc_hobbs_cafe': { x: 77, y: 21, name: 'Hobbs Cafe' },          // Hobbs Cafe
+      'loc_workshop': { x: 63, y: 47, name: 'Workshop' },              // Harvey Oak Supply Store
+      'loc_bulletin_hall': { x: 84, y: 47, name: 'Bulletin Hall' },    // Willows Market
+      'loc_byte_park': { x: 27, y: 46, name: 'Byte Park' }             // Johnson Park
     };
+
+    // Create visual markers for each location on the map
+    function createLocationMarkers(scene) {
+      Object.entries(LOCATION_COORDS).forEach(([locId, coords]) => {
+        const x = coords.x * tile_width;
+        const y = coords.y * tile_width;
+
+        // Create a semi-transparent marker circle
+        const marker = scene.add.circle(x, y, 24, 0xffd866, 0.6);
+        marker.setStrokeStyle(3, 0xffffff);
+        marker.setDepth(5);
+
+        // Create location name label
+        const label = scene.add.text(x, y - 40, coords.name, {
+          fontSize: '14px',
+          fontFamily: 'Courier New',
+          color: '#ffffff',
+          backgroundColor: '#000000aa',
+          padding: { x: 6, y: 3 }
+        });
+        label.setOrigin(0.5);
+        label.setDepth(6);
+      });
+    }
 
     // Available character sprites for variety
     const CHARACTER_SPRITES = [
