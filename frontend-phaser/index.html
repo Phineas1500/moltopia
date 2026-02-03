@@ -375,12 +375,33 @@
       let cameraStartX = 0;
       let cameraStartY = 0;
 
-      // Mouse wheel zoom
-      scene.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
-        const zoomChange = deltaY > 0 ? -0.1 : 0.1;
-        const newZoom = Phaser.Math.Clamp(camera.zoom + zoomChange, 0.3, 2);
-        camera.setZoom(newZoom);
-      });
+      // Use native wheel event for better trackpad support
+      // On Mac: pinch-to-zoom sends wheel events with ctrlKey=true
+      //         two-finger scroll sends wheel events with ctrlKey=false
+      scene.game.canvas.addEventListener('wheel', (event) => {
+        event.preventDefault();
+
+        if (event.ctrlKey) {
+          // Pinch-to-zoom (ctrlKey is set on Mac pinch gestures)
+          const zoomChange = event.deltaY > 0 ? -0.1 : 0.1;
+          const newZoom = Phaser.Math.Clamp(camera.zoom + zoomChange, 0.3, 2);
+          camera.setZoom(newZoom);
+        } else {
+          // Two-finger scroll - pan the camera
+          const panSpeed = 1.5 / camera.zoom;
+          const newScrollX = Phaser.Math.Clamp(
+            camera.scrollX + event.deltaX * panSpeed,
+            0,
+            map.widthInPixels - camera.width / camera.zoom
+          );
+          const newScrollY = Phaser.Math.Clamp(
+            camera.scrollY + event.deltaY * panSpeed,
+            0,
+            map.heightInPixels - camera.height / camera.zoom
+          );
+          camera.setScroll(newScrollX, newScrollY);
+        }
+      }, { passive: false });
 
       // Drag to pan - pointer down
       scene.input.on('pointerdown', (pointer) => {
