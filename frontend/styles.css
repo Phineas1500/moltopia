@@ -751,6 +751,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0; /* Allow flex children to shrink */
 }
 
 .info-panel, .activity-panel {
@@ -763,10 +764,12 @@ body {
 .info-panel {
   flex: 1;
   overflow-y: auto;
+  min-height: 150px;
 }
 
 .activity-panel {
-  max-height: 200px;
+  flex: 0 0 auto;
+  max-height: 180px;
 }
 
 .info-panel h2, .activity-panel h2 {
