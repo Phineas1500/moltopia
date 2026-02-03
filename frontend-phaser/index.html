@@ -174,7 +174,7 @@
       </div>
 
       <div class="instructions">
-        Use arrow keys to pan the camera
+        Drag to pan | Scroll to zoom | Arrow keys also work
       </div>
     </div>
   </div>
@@ -332,17 +332,11 @@
       foregroundL2.setDepth(2);
 
       // Create invisible camera target
-      player = this.physics.add
-        .sprite(DEFAULT_SPAWN.x * tile_width, DEFAULT_SPAWN.y * tile_width, 'atlas', 'down')
-        .setSize(30, 40)
-        .setOffset(0, 0);
-      player.setDepth(-1);
-      player.setAlpha(0);
-
-      // Camera setup
+      // Camera setup - center on default spawn location
       const camera = this.cameras.main;
-      camera.startFollow(player);
       camera.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+      camera.centerOn(DEFAULT_SPAWN.x * tile_width, DEFAULT_SPAWN.y * tile_width);
+      camera.setZoom(1);
       cursors = this.input.keyboard.createCursorKeys();
 
       // Store scene reference for agent creation
@@ -359,17 +353,79 @@
 
       connectionStatus.textContent = 'Live';
       connectionStatus.className = 'connected';
+
+      // Setup mouse/trackpad controls
+      setupCameraControls(this, camera, map);
+    }
+
+    function setupCameraControls(scene, camera, map) {
+      // Variables for drag panning
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let cameraStartX = 0;
+      let cameraStartY = 0;
+
+      // Mouse wheel zoom
+      scene.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+        const zoomChange = deltaY > 0 ? -0.1 : 0.1;
+        const newZoom = Phaser.Math.Clamp(camera.zoom + zoomChange, 0.3, 2);
+        camera.setZoom(newZoom);
+      });
+
+      // Drag to pan - pointer down
+      scene.input.on('pointerdown', (pointer) => {
+        if (pointer.button === 0) { // Left click or touch
+          isDragging = true;
+          dragStartX = pointer.x;
+          dragStartY = pointer.y;
+          cameraStartX = camera.scrollX;
+          cameraStartY = camera.scrollY;
+        }
+      });
+
+      // Drag to pan - pointer move
+      scene.input.on('pointermove', (pointer) => {
+        if (isDragging) {
+          const dx = (dragStartX - pointer.x) / camera.zoom;
+          const dy = (dragStartY - pointer.y) / camera.zoom;
+
+          // Calculate new camera position with bounds checking
+          const newScrollX = Phaser.Math.Clamp(
+            cameraStartX + dx,
+            0,
+            map.widthInPixels - camera.width / camera.zoom
+          );
+          const newScrollY = Phaser.Math.Clamp(
+            cameraStartY + dy,
+            0,
+            map.heightInPixels - camera.height / camera.zoom
+          );
+
+          camera.setScroll(newScrollX, newScrollY);
+        }
+      });
+
+      // Drag to pan - pointer up
+      scene.input.on('pointerup', () => {
+        isDragging = false;
+      });
+
+      // Also stop dragging if pointer leaves canvas
+      scene.input.on('pointerout', () => {
+        isDragging = false;
+      });
     }
 
     function update(time, delta) {
-      // Camera movement with arrow keys
-      const cameraSpeed = 300;
-      player.body.setVelocity(0);
+      // Camera movement with arrow keys (keep as backup)
+      const cameraSpeed = 8;
+      const camera = this.cameras.main;
 
-      if (cursors.left.isDown) player.body.setVelocityX(-cameraSpeed);
-      if (cursors.right.isDown) player.body.setVelocityX(cameraSpeed);
-      if (cursors.up.isDown) player.body.setVelocityY(-cameraSpeed);
-      if (cursors.down.isDown) player.body.setVelocityY(cameraSpeed);
+      if (cursors.left.isDown) camera.scrollX -= cameraSpeed;
+      if (cursors.right.isDown) camera.scrollX += cameraSpeed;
+      if (cursors.up.isDown) camera.scrollY -= cameraSpeed;
+      if (cursors.down.isDown) camera.scrollY += cameraSpeed;
     }
 
     // ============ MOLTOPIA DATA LOADING ============
