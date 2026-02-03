@@ -2,6 +2,7 @@ import { db } from '../db/index.js';
 import { conversations, conversationMessages, worldEvents, agents } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { PubSub } from './cache.service.js';
+import { RelationshipService } from './relationship.service.js';
 
 export const ConversationService = {
   /**
@@ -25,6 +26,9 @@ export const ConversationService = {
         participantIds: data.participantIds,
       })
       .returning();
+
+    // Record relationships between all participants
+    await RelationshipService.recordConversation(id);
 
     return conversation;
   },
@@ -87,6 +91,10 @@ export const ConversationService = {
         isPublic: conversation.isPublic,
         participantIds,
       });
+
+      // Record relationship interactions
+      const otherParticipants = participantIds.filter((id) => id !== authorId);
+      await RelationshipService.recordMessage(authorId, otherParticipants);
     }
 
     return message;
