@@ -215,20 +215,26 @@
     let pronunciatios = {};
     const tile_width = 32;
 
-    // Default spawn location (Town Square area)
-    const DEFAULT_SPAWN = { x: 70, y: 40 };
+    // Default spawn location (outdoor area with good visibility)
+    const DEFAULT_SPAWN = { x: 58, y: 58 };
 
     function preload() {
       this.load.crossOrigin = '';
 
-      // Load tilesets
+      // Load all block tilesets (for collisions/metadata)
       this.load.image('blocks_1', 'assets/the_ville/visuals/map_assets/blocks/blocks_1.png');
+      this.load.image('blocks_2', 'assets/the_ville/visuals/map_assets/blocks/blocks_2.png');
+      this.load.image('blocks_3', 'assets/the_ville/visuals/map_assets/blocks/blocks_3.png');
+
+      // Load interior/wall tilesets
       this.load.image('walls', 'assets/the_ville/visuals/map_assets/v1/Room_Builder_32x32.png');
       this.load.image('interiors_pt1', 'assets/the_ville/visuals/map_assets/v1/interiors_pt1.png');
       this.load.image('interiors_pt2', 'assets/the_ville/visuals/map_assets/v1/interiors_pt2.png');
       this.load.image('interiors_pt3', 'assets/the_ville/visuals/map_assets/v1/interiors_pt3.png');
       this.load.image('interiors_pt4', 'assets/the_ville/visuals/map_assets/v1/interiors_pt4.png');
       this.load.image('interiors_pt5', 'assets/the_ville/visuals/map_assets/v1/interiors_pt5.png');
+
+      // Load CuteRPG tilesets
       this.load.image('CuteRPG_Field_B', 'assets/the_ville/visuals/map_assets/cute_rpg_word_VXAce/tilesets/CuteRPG_Field_B.png');
       this.load.image('CuteRPG_Field_C', 'assets/the_ville/visuals/map_assets/cute_rpg_word_VXAce/tilesets/CuteRPG_Field_C.png');
       this.load.image('CuteRPG_Harbor_C', 'assets/the_ville/visuals/map_assets/cute_rpg_word_VXAce/tilesets/CuteRPG_Harbor_C.png');
@@ -242,18 +248,38 @@
       // Load the Tiled JSON map
       this.load.tilemapTiledJSON('map', 'assets/the_ville/visuals/the_ville_jan7.json');
 
-      // Load a default character atlas for agents
+      // Load multiple character atlases for variety
       this.load.atlas('atlas', 'assets/characters/Yuriko_Yamamoto.png', 'assets/characters/atlas.json');
+      this.load.atlas('Klaus_Mueller', 'assets/characters/Klaus_Mueller.png', 'assets/characters/atlas.json');
+      this.load.atlas('Maria_Lopez', 'assets/characters/Maria_Lopez.png', 'assets/characters/atlas.json');
+      this.load.atlas('Eddy_Lin', 'assets/characters/Eddy_Lin.png', 'assets/characters/atlas.json');
+      this.load.atlas('John_Lin', 'assets/characters/John_Lin.png', 'assets/characters/atlas.json');
+      this.load.atlas('Sam_Moore', 'assets/characters/Sam_Moore.png', 'assets/characters/atlas.json');
+      this.load.atlas('Isabella_Rodriguez', 'assets/characters/Isabella_Rodriguez.png', 'assets/characters/atlas.json');
+      this.load.atlas('Tom_Moreno', 'assets/characters/Tom_Moreno.png', 'assets/characters/atlas.json');
 
       // Load speech bubble
       this.load.image('speech_bubble', 'assets/speech_bubble/v3.png');
     }
 
     function create() {
+      // Set background color for areas without tiles
+      this.cameras.main.setBackgroundColor('#5a8a4a'); // grass green
+
       const map = this.make.tilemap({ key: 'map' });
 
-      // Add tilesets
-      const collisions = map.addTilesetImage('blocks', 'blocks_1');
+      // Add a solid background rectangle behind everything
+      const bg = this.add.rectangle(
+        map.widthInPixels / 2, map.heightInPixels / 2,
+        map.widthInPixels, map.heightInPixels,
+        0x5a8a4a
+      );
+      bg.setDepth(-100);
+
+      // Add tilesets - match names from Tiled map JSON
+      const blocks = map.addTilesetImage('blocks', 'blocks_1');
+      const blocks_2 = map.addTilesetImage('blocks_2', 'blocks_2');
+      const blocks_3 = map.addTilesetImage('blocks_3', 'blocks_3');
       const walls = map.addTilesetImage('Room_Builder_32x32', 'walls');
       const interiors_pt1 = map.addTilesetImage('interiors_pt1', 'interiors_pt1');
       const interiors_pt2 = map.addTilesetImage('interiors_pt2', 'interiors_pt2');
@@ -270,27 +296,32 @@
       const CuteRPG_Desert_B = map.addTilesetImage('CuteRPG_Desert_B', 'CuteRPG_Desert_B');
       const CuteRPG_Forest_C = map.addTilesetImage('CuteRPG_Forest_C', 'CuteRPG_Forest_C');
 
-      // Create layers
+      // Create tileset group for all visual layers
       const tileset_group = [
         CuteRPG_Field_B, CuteRPG_Field_C, CuteRPG_Harbor_C, CuteRPG_Village_B,
         CuteRPG_Forest_B, CuteRPG_Desert_C, CuteRPG_Mountains_B, CuteRPG_Desert_B, CuteRPG_Forest_C,
         interiors_pt1, interiors_pt2, interiors_pt3, interiors_pt4, interiors_pt5, walls
       ];
 
+      // Create visual layers
       map.createLayer('Bottom Ground', tileset_group, 0, 0);
       map.createLayer('Exterior Ground', tileset_group, 0, 0);
       map.createLayer('Exterior Decoration L1', tileset_group, 0, 0);
       map.createLayer('Exterior Decoration L2', tileset_group, 0, 0);
       map.createLayer('Interior Ground', tileset_group, 0, 0);
-      map.createLayer('Wall', [CuteRPG_Field_C, walls], 0, 0);
+      map.createLayer('Wall', tileset_group, 0, 0);
       map.createLayer('Interior Furniture L1', tileset_group, 0, 0);
       map.createLayer('Interior Furniture L2 ', tileset_group, 0, 0);
       const foregroundL1 = map.createLayer('Foreground L1', tileset_group, 0, 0);
       const foregroundL2 = map.createLayer('Foreground L2', tileset_group, 0, 0);
+      // Collisions layer uses blocks tilesets
+      const collisions = [blocks, blocks_2, blocks_3];
       const collisionsLayer = map.createLayer('Collisions', collisions, 0, 0);
 
-      collisionsLayer.setCollisionByProperty({ collide: true });
-      collisionsLayer.setDepth(-1);
+      if (collisionsLayer) {
+        collisionsLayer.setCollisionByProperty({ collide: true });
+        collisionsLayer.setVisible(false); // Hide collision layer - it's only for physics
+      }
       foregroundL1.setDepth(2);
       foregroundL2.setDepth(2);
 
@@ -393,30 +424,51 @@
       }
     }
 
-    // Map Moltopia locations to Smallville coordinates
+    // Map Moltopia locations to Smallville coordinates (based on map layout)
+    // Map is 140x100 tiles, each tile is 32px
     const LOCATION_COORDS = {
-      'loc_town_square': { x: 70, y: 40 },
-      'loc_capitol': { x: 35, y: 25 },
-      'loc_archive': { x: 105, y: 25 },
-      'loc_hobbs_cafe': { x: 55, y: 55 },
-      'loc_workshop': { x: 25, y: 55 },
-      'loc_bulletin_hall': { x: 85, y: 55 },
-      'loc_byte_park': { x: 70, y: 75 },
-      'loc_houses': { x: 40, y: 75 }
+      'loc_town_square': { x: 70, y: 44 },      // Central plaza area
+      'loc_capitol': { x: 122, y: 28 },         // College/admin building (top right)
+      'loc_archive': { x: 122, y: 40 },         // Library/college area
+      'loc_hobbs_cafe': { x: 32, y: 44 },       // Café/bar (left side)
+      'loc_workshop': { x: 58, y: 44 },         // Supply store/workshop area
+      'loc_bulletin_hall': { x: 82, y: 55 },    // Dorm/community area
+      'loc_byte_park': { x: 15, y: 50 },        // Park (far left)
+      'loc_houses': { x: 32, y: 78 }            // Houses (bottom left)
     };
+
+    // Available character sprites for variety
+    const CHARACTER_SPRITES = [
+      'atlas', 'Klaus_Mueller', 'Maria_Lopez', 'Eddy_Lin',
+      'John_Lin', 'Sam_Moore', 'Isabella_Rodriguez', 'Tom_Moreno'
+    ];
+
+    function getCharacterSprite(agentId) {
+      // Use agent ID hash to consistently assign a sprite
+      let hash = 0;
+      for (let i = 0; i < agentId.length; i++) {
+        hash = ((hash << 5) - hash) + agentId.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return CHARACTER_SPRITES[Math.abs(hash) % CHARACTER_SPRITES.length];
+    }
 
     function updateAgentSprite(agent, location) {
       const scene = window.phaserScene;
       if (!scene) return;
 
       const coords = LOCATION_COORDS[agent.locationId] || DEFAULT_SPAWN;
-      const x = coords.x * tile_width + tile_width / 2 + Math.random() * 30 - 15;
-      const y = coords.y * tile_width + tile_width + Math.random() * 30 - 15;
+      // Add some randomness so agents don't stack exactly
+      const x = coords.x * tile_width + tile_width / 2 + Math.random() * 40 - 20;
+      const y = coords.y * tile_width + tile_width + Math.random() * 40 - 20;
 
       if (!agentSprites[agent.id]) {
-        // Create new sprite
+        // Choose a character sprite based on agent ID
+        const spriteKey = getCharacterSprite(agent.id);
+
+        // Create new sprite with variety
         const sprite = scene.physics.add
-          .sprite(x, y, 'atlas', 'down')
+          .sprite(x, y, spriteKey, 'down')
           .setSize(30, 40)
           .setOffset(0, 0);
         sprite.displayWidth = 40;
