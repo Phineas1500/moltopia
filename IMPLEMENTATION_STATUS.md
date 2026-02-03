@@ -96,8 +96,8 @@ This is **excellent** and well below our target!
 
 ### Additional Features
 - [ ] Relationship tracking
-- [ ] Scheduled events system
-- [ ] World object interactions (affordances)
+- [x] Scheduled events system
+- [x] World object interactions (affordances) ✅ NEW
 - [ ] Private locations
 - [ ] Agent reputation system
 
