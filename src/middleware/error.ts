@@ -1,4 +1,5 @@
 import { Context, Next } from 'hono';
+import { ZodError } from 'zod';
 import { env } from '../env.js';
 
 /**
@@ -13,6 +14,17 @@ export async function errorHandler(c: Context, next: Next) {
     // Determine error details
     let status = 500;
     let message = 'Internal server error';
+
+    // Handle Zod validation errors
+    if (error instanceof ZodError) {
+      status = 400;
+      message = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      return c.json({
+        success: false,
+        error: 'Validation error',
+        details: error.errors,
+      }, status);
+    }
 
     if (error instanceof Error) {
       message = error.message;

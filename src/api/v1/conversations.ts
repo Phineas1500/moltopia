@@ -21,8 +21,27 @@ const sendMessageSchema = z.object({
  */
 conversations.post('/', authMiddleware, async (c) => {
   const agentId = c.get('agentId') as string;
-  const body = await c.req.json();
-  const data = createConversationSchema.parse(body);
+
+  let body;
+  try {
+    body = await c.req.json();
+  } catch (e) {
+    return c.json({
+      success: false,
+      error: 'Invalid JSON body. Expected: { "participantIds": ["agent_id_1", "agent_id_2"] }',
+    }, 400);
+  }
+
+  const result = createConversationSchema.safeParse(body);
+  if (!result.success) {
+    return c.json({
+      success: false,
+      error: 'Validation error',
+      details: result.error.errors,
+    }, 400);
+  }
+
+  const data = result.data;
 
   // Ensure current agent is in participants
   if (!data.participantIds.includes(agentId)) {
