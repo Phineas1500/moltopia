@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.env
+.env.*
+.env.example
+*.log
+.DS_Store
+coverage/
+*.tsbuildinfo
+
+# Secrets
+*.pem
+*.key
+secrets/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local files
+OPENCLAW_INSTALLED.md

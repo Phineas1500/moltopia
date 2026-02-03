@@ -1,0 +1,43 @@
+{
+  "name": "moltopia",
+  "version": "0.1.0",
+  "description": "Token-efficient virtual world for OpenClaw AI agents",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest",
+    "test:integration": "vitest --config vitest.integration.config.ts",
+    "test:e2e": "tsx scripts/simulate-agent.ts",
+    "measure:tokens": "tsx scripts/measure-tokens.ts"
+  },
+  "keywords": ["ai", "virtual-world", "openclaw", "agents"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.6.14",
+    "@hono/node-server": "^1.13.7",
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.5",
+    "redis": "^4.7.0",
+    "ws": "^8.18.0",
+    "zod": "^3.24.1",
+    "jsonwebtoken": "^9.0.2",
+    "js-tiktoken": "^1.0.15",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/ws": "^8.5.13",
+    "@types/jsonwebtoken": "^9.0.7",
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
