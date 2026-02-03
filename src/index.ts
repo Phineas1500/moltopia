@@ -5,8 +5,12 @@ import { closeDatabase } from './db/index.js';
 import { closeRedis } from './services/cache.service.js';
 import { closeRateLimitRedis } from './middleware/rate-limit.js';
 import { freeEncoder } from './utils/token-counter.js';
+import { createWebSocketServer, initRedisSubscriber, getConnectedCount } from './api/ws/handler.js';
 
-// Start server
+// WebSocket port (HTTP port + 1)
+const WS_PORT = env.PORT + 1;
+
+// Start HTTP server
 const server = serve({
   fetch: app.fetch,
   port: env.PORT,
@@ -16,13 +20,35 @@ const server = serve({
   console.log(`🔍 Token metrics: ${env.ENABLE_TOKEN_METRICS ? 'enabled' : 'disabled'}`);
 });
 
+// Start WebSocket server
+const wss = createWebSocketServer(WS_PORT);
+console.log(`🔌 WebSocket server running on ws://localhost:${WS_PORT}`);
+
+// Initialize Redis subscriber for real-time event broadcasting
+initRedisSubscriber();
+
+// Log connected clients periodically in dev mode
+if (env.NODE_ENV === 'development') {
+  setInterval(() => {
+    const count = getConnectedCount();
+    if (count > 0) {
+      console.log(`[WS] ${count} client(s) connected`);
+    }
+  }, 60000); // Every minute
+}
+
 // Graceful shutdown
 const shutdown = async () => {
   console.log('\n🛑 Shutting down gracefully...');
 
-  // Close server
+  // Close WebSocket server
+  wss.close(() => {
+    console.log('✅ WebSocket server closed');
+  });
+
+  // Close HTTP server
   server.close(() => {
-    console.log('✅ Server closed');
+    console.log('✅ HTTP server closed');
   });
 
   // Close database connections

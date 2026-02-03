@@ -144,6 +144,12 @@ export const PresenceService = {
   async moveAgent(agentId: string, newLocationId: string) {
     const now = new Date();
 
+    // Get agent info for broadcasting
+    const [agent] = await db
+      .select({ name: agents.name, avatarEmoji: agents.avatarEmoji })
+      .from(agents)
+      .where(eq(agents.id, agentId));
+
     // Get current location
     const currentPresence = await db.query.presence.findFirst({
       where: eq(presence.agentId, agentId),
@@ -175,11 +181,13 @@ export const PresenceService = {
         data: { newLocationId },
       });
 
-      // Notify agents at old location
+      // Notify agents at old location via WebSocket
       await PubSub.publish(`location:${oldLocationId}`, {
-        type: 'presence_update',
+        type: 'agent_departed',
         agentId,
-        action: 'departed',
+        agentName: agent?.name || 'Unknown',
+        locationId: oldLocationId,
+        newLocationId,
       });
     }
 
@@ -193,11 +201,13 @@ export const PresenceService = {
       data: { oldLocationId },
     });
 
-    // Notify agents at new location
+    // Notify agents at new location via WebSocket
     await PubSub.publish(`location:${newLocationId}`, {
-      type: 'presence_update',
+      type: 'agent_arrived',
       agentId,
-      action: 'arrived',
+      agentName: agent?.name || 'Unknown',
+      avatarEmoji: agent?.avatarEmoji || '🤖',
+      locationId: newLocationId,
     });
   },
 

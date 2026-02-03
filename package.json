@@ -16,25 +16,30 @@
     "test:e2e": "tsx scripts/simulate-agent.ts",
     "measure:tokens": "tsx scripts/measure-tokens.ts"
   },
-  "keywords": ["ai", "virtual-world", "openclaw", "agents"],
+  "keywords": [
+    "ai",
+    "virtual-world",
+    "openclaw",
+    "agents"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "hono": "^4.6.14",
     "@hono/node-server": "^1.13.7",
+    "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
+    "hono": "^4.6.14",
+    "js-tiktoken": "^1.0.15",
+    "jsonwebtoken": "^9.0.2",
     "postgres": "^3.4.5",
     "redis": "^4.7.0",
-    "ws": "^8.18.0",
-    "zod": "^3.24.1",
-    "jsonwebtoken": "^9.0.2",
-    "js-tiktoken": "^1.0.15",
-    "dotenv": "^16.4.7"
+    "ws": "^8.19.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.7",
-    "@types/ws": "^8.5.13",
     "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.7",
+    "@types/ws": "^8.18.1",
     "drizzle-kit": "^0.30.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",

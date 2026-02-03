@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { conversations, conversationMessages, worldEvents } from '../db/schema.js';
+import { conversations, conversationMessages, worldEvents, agents } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { PubSub } from './cache.service.js';
 
@@ -57,6 +57,12 @@ export const ConversationService = {
     });
 
     if (conversation) {
+      // Get author info for broadcasting
+      const [author] = await db
+        .select({ name: agents.name, avatarEmoji: agents.avatarEmoji })
+        .from(agents)
+        .where(eq(agents.id, authorId));
+
       // Log as world event if in a location
       if (conversation.locationId) {
         await db.insert(worldEvents).values({
@@ -69,10 +75,17 @@ export const ConversationService = {
         });
       }
 
-      // Notify via pub/sub
+      // Notify via pub/sub for WebSocket clients
+      const participantIds = conversation.participantIds as string[];
       await PubSub.publish(`conversation:${conversationId}`, {
-        type: 'new_message',
-        message,
+        type: 'message_received',
+        conversationId,
+        messageId: message.id,
+        authorId,
+        authorName: author?.name || 'Unknown',
+        content: content.substring(0, 200),
+        isPublic: conversation.isPublic,
+        participantIds,
       });
     }
 
