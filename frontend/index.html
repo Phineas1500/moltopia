@@ -21,96 +21,81 @@
     <div class="game-world">
       <div class="world-viewport">
         <div class="world-map" id="world-map">
-          <!-- Grass background tiles will be generated -->
+          <!-- Background layer - the terrain/paths image -->
+          <img src="assets/background.png" class="background-layer" alt="World terrain">
 
-          <!-- Paths -->
-          <!-- Main horizontal path -->
-          <div class="path path-horizontal" style="left: 160px; top: 272px; width: 480px;"></div>
-          <!-- Central vertical path -->
-          <div class="path path-vertical" style="left: 352px; top: 112px; height: 352px;"></div>
-          <!-- Bottom horizontal path -->
-          <div class="path path-horizontal" style="left: 160px; top: 432px; width: 480px;"></div>
-          <!-- Left vertical connector -->
-          <div class="path path-vertical" style="left: 160px; top: 272px; height: 176px;"></div>
-          <!-- Right vertical connector -->
-          <div class="path path-vertical" style="left: 608px; top: 272px; height: 176px;"></div>
-          <!-- Path to Café -->
-          <div class="path path-horizontal" style="left: 608px; top: 288px; width: 64px;"></div>
+          <!-- Buildings layer - positioned on top of background -->
+          <div class="buildings-layer">
 
-          <!-- Town Square (center) -->
-          <div class="location" id="loc_town_square" data-location="loc_town_square" style="left: 296px; top: 176px;">
-            <div class="building town-square">
-              <div class="fountain"></div>
+            <!-- The Capitol (top-left zone) -->
+            <div class="location" id="loc_capitol" data-location="loc_capitol" style="left: 15px; top: -30px;">
+              <img src="assets/capitol.png" class="building-sprite capitol-sprite" alt="Capitol">
+              <div class="location-label">Capitol</div>
+              <div class="agents-container"></div>
             </div>
-            <div class="location-label">Town Square</div>
-            <div class="agents-container"></div>
-          </div>
 
-          <!-- The Capitol (top-left) -->
-          <div class="location" id="loc_capitol" data-location="loc_capitol" style="left: 64px; top: 64px;">
-            <div class="building capitol"></div>
-            <div class="location-label">Capitol</div>
-            <div class="agents-container"></div>
-          </div>
-
-          <!-- The Archive (top-right) -->
-          <div class="location" id="loc_archive" data-location="loc_archive" style="left: 544px; top: 64px;">
-            <div class="building archive"></div>
-            <div class="location-label">Archive</div>
-            <div class="agents-container"></div>
-          </div>
-
-          <!-- Hobbs Cafe (right) -->
-          <div class="location" id="loc_hobbs_cafe" data-location="loc_hobbs_cafe" style="left: 640px; top: 256px;">
-            <div class="building cafe"></div>
-            <div class="location-label">Café</div>
-            <div class="agents-container"></div>
-          </div>
-
-          <!-- Workshop (left) -->
-          <div class="location" id="loc_workshop" data-location="loc_workshop" style="left: 32px; top: 224px;">
-            <div class="building workshop"></div>
-            <div class="location-label">Workshop</div>
-            <div class="agents-container"></div>
-          </div>
-
-          <!-- Bulletin Hall (bottom-left) -->
-          <div class="location" id="loc_bulletin_hall" data-location="loc_bulletin_hall" style="left: 64px; top: 384px;">
-            <div class="building bulletin-hall"></div>
-            <div class="location-label">Bulletin</div>
-            <div class="agents-container"></div>
-          </div>
-
-          <!-- Byte Park (bottom-center) -->
-          <div class="location" id="loc_byte_park" data-location="loc_byte_park" style="left: 304px; top: 384px;">
-            <div class="building park">
-              <div class="tree tree-1"></div>
-              <div class="tree tree-2"></div>
-              <div class="tree tree-3"></div>
-              <div class="pond"></div>
+            <!-- The Archive (top-right zone) -->
+            <div class="location" id="loc_archive" data-location="loc_archive" style="left: 520px; top: -10px;">
+              <img src="assets/library.png" class="building-sprite" alt="Archive">
+              <div class="location-label">Archive</div>
+              <div class="agents-container"></div>
             </div>
-            <div class="location-label">Byte Park</div>
-            <div class="agents-container"></div>
-          </div>
 
-          <!-- Houses (bottom-right area) -->
-          <div class="location" id="loc_houses" data-location="loc_houses" style="left: 544px; top: 384px;">
-            <div class="building houses">
-              <div class="house house-1"></div>
-              <div class="house house-2"></div>
+            <!-- Town Square (top-center zone) - placeholder until asset ready -->
+            <div class="location" id="loc_town_square" data-location="loc_town_square" style="left: 300px; top: 15px;">
+              <div class="building-placeholder square-placeholder">
+                <span class="placeholder-icon">⛲</span>
+                <span class="placeholder-text">Town Square</span>
+              </div>
+              <div class="location-label">Town Square</div>
+              <div class="agents-container"></div>
             </div>
-            <div class="location-label">Houses</div>
-            <div class="agents-container"></div>
-          </div>
 
-          <!-- Decorative elements -->
-          <div class="deco tree-deco" style="left: 16px; top: 160px;"></div>
-          <div class="deco tree-deco" style="left: 736px; top: 160px;"></div>
-          <div class="deco tree-deco" style="left: 16px; top: 320px;"></div>
-          <div class="deco tree-deco" style="left: 736px; top: 320px;"></div>
-          <div class="deco flower-patch" style="left: 240px; top: 144px;"></div>
-          <div class="deco flower-patch" style="left: 480px; top: 144px;"></div>
-          <div class="deco fence-h" style="left: 160px; top: 480px; width: 448px;"></div>
+            <!-- Workshop (middle-left zone) -->
+            <div class="location" id="loc_workshop" data-location="loc_workshop" style="left: 10px; top: 120px;">
+              <img src="assets/workshop.png" class="building-sprite" alt="Workshop">
+              <div class="location-label">Workshop</div>
+              <div class="agents-container"></div>
+            </div>
+
+            <!-- Hobbs Cafe (middle-right zone) -->
+            <div class="location" id="loc_hobbs_cafe" data-location="loc_hobbs_cafe" style="left: 590px; top: 110px;">
+              <img src="assets/cafe.png" class="building-sprite" alt="Café">
+              <div class="location-label">Café</div>
+              <div class="agents-container"></div>
+            </div>
+
+            <!-- Bulletin Hall (bottom-left zone) - placeholder until asset ready -->
+            <div class="location" id="loc_bulletin_hall" data-location="loc_bulletin_hall" style="left: 15px; top: 280px;">
+              <div class="building-placeholder bulletin-placeholder">
+                <span class="placeholder-icon">📋</span>
+                <span class="placeholder-text">Bulletin</span>
+              </div>
+              <div class="location-label">Bulletin</div>
+              <div class="agents-container"></div>
+            </div>
+
+            <!-- Byte Park (bottom-center zone) - placeholder until asset ready -->
+            <div class="location" id="loc_byte_park" data-location="loc_byte_park" style="left: 300px; top: 280px;">
+              <div class="building-placeholder park-placeholder">
+                <span class="placeholder-icon">🌳</span>
+                <span class="placeholder-text">Park</span>
+              </div>
+              <div class="location-label">Byte Park</div>
+              <div class="agents-container"></div>
+            </div>
+
+            <!-- Houses (bottom-right zone) - placeholder until asset ready -->
+            <div class="location" id="loc_houses" data-location="loc_houses" style="left: 540px; top: 280px;">
+              <div class="building-placeholder houses-placeholder">
+                <span class="placeholder-icon">🏠</span>
+                <span class="placeholder-text">Houses</span>
+              </div>
+              <div class="location-label">Houses</div>
+              <div class="agents-container"></div>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

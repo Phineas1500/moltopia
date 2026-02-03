@@ -1,31 +1,15 @@
-/* Moltopia - Pixel Art Game World */
+/* Moltopia - Image-based Game World */
 
 :root {
-  /* Color palette - earthy/retro game colors */
-  --grass-light: #7ec850;
-  --grass-mid: #5eb840;
-  --grass-dark: #3e8948;
-  --path-light: #d4a574;
-  --path-mid: #c49356;
-  --path-dark: #a67c52;
-  --water: #4fa4b8;
-  --water-light: #7ec8e3;
-  --water-dark: #3d8fa3;
-  --wood-light: #c4a574;
-  --wood-mid: #8b6914;
-  --wood-dark: #5c4d1f;
-  --roof-red: #c84c4c;
-  --roof-blue: #4c6ec8;
-  --roof-purple: #8b5eb8;
-  --roof-orange: #d89048;
-  --stone: #9ca0a8;
-  --stone-dark: #686c74;
-  --white: #f8f8f8;
-  --cream: #f0e8d8;
   --panel-bg: rgba(24, 28, 40, 0.95);
+  --panel-border: #2a2e3e;
   --text-light: #f4f4f4;
   --text-dim: #8b9bb4;
   --accent: #ffd866;
+  --grass-mid: #5eb840;
+  --water: #4fa4b8;
+  --roof-red: #c84c4c;
+  --roof-purple: #8b5eb8;
 }
 
 * {
@@ -40,11 +24,12 @@ body {
   font-family: 'Courier New', monospace;
   height: 100vh;
   overflow: hidden;
+  /* Keep pixel art crisp */
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
 
-/* Main layout */
+/* ============ MAIN LAYOUT ============ */
 .game-container {
   display: grid;
   grid-template-columns: 1fr 280px;
@@ -57,7 +42,7 @@ body {
   padding: 8px;
 }
 
-/* Header */
+/* ============ HEADER ============ */
 .game-header {
   grid-area: header;
   display: flex;
@@ -65,7 +50,7 @@ body {
   align-items: center;
   padding: 8px 16px;
   background: var(--panel-bg);
-  border: 3px solid #2a2e3e;
+  border: 3px solid var(--panel-border);
   border-radius: 4px;
 }
 
@@ -99,648 +84,180 @@ body {
   color: white;
 }
 
-/* Game world viewport */
+/* ============ GAME WORLD ============ */
 .game-world {
   grid-area: world;
   background: var(--panel-bg);
-  border: 3px solid #2a2e3e;
+  border: 3px solid var(--panel-border);
   border-radius: 4px;
   overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
 }
 
 .world-viewport {
   display: flex;
   justify-content: center;
-  min-height: 100%;
+  align-items: center;
 }
 
-/* The actual game map */
+/* The game map container */
 .world-map {
-  width: 768px;
-  height: 512px;
   position: relative;
-  background:
-    /* Grass pattern using gradients */
-    repeating-linear-gradient(
-      0deg,
-      var(--grass-light) 0px,
-      var(--grass-light) 16px,
-      var(--grass-mid) 16px,
-      var(--grass-mid) 32px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0px,
-      transparent 16px,
-      rgba(0,0,0,0.05) 16px,
-      rgba(0,0,0,0.05) 32px
-    );
-  background-color: var(--grass-mid);
-  border: 4px solid var(--grass-dark);
-  box-shadow: inset 0 0 60px rgba(0,0,0,0.2);
+  border: 4px solid #2a5830;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 
-/* Dirt paths */
-.path {
+/* Background terrain image */
+.background-layer {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Buildings container - overlays the background */
+.buildings-layer {
   position: absolute;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      var(--path-light) 0px,
-      var(--path-mid) 4px,
-      var(--path-dark) 8px,
-      var(--path-mid) 12px,
-      var(--path-light) 16px
-    );
-  box-shadow:
-    inset 0 2px 0 rgba(255,255,255,0.2),
-    inset 0 -2px 0 rgba(0,0,0,0.2);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
-.path-horizontal {
-  height: 32px;
-}
-
-.path-vertical {
-  width: 32px;
-}
-
-/* Locations - positioned absolutely */
+/* ============ LOCATIONS ============ */
 .location {
   position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
+  pointer-events: auto;
   z-index: 10;
 }
 
-.location-label {
-  background: rgba(0,0,0,0.75);
-  color: var(--text-light);
-  padding: 2px 6px;
-  font-size: 9px;
-  border-radius: 2px;
-  margin-top: 4px;
-  white-space: nowrap;
-}
-
-/* Buildings base */
-.building {
-  position: relative;
+/* Building sprite images */
+.building-sprite {
+  max-width: 160px;
+  height: auto;
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.4));
+  transition: transform 0.2s, filter 0.2s;
 }
 
-/* ============ TOWN SQUARE ============ */
-.town-square {
-  width: 144px;
-  height: 112px;
-  background:
-    /* Cobblestone pattern */
-    radial-gradient(circle at 25% 25%, var(--path-light) 4px, transparent 4px),
-    radial-gradient(circle at 75% 25%, var(--path-light) 4px, transparent 4px),
-    radial-gradient(circle at 50% 50%, var(--path-light) 4px, transparent 4px),
-    radial-gradient(circle at 25% 75%, var(--path-light) 4px, transparent 4px),
-    radial-gradient(circle at 75% 75%, var(--path-light) 4px, transparent 4px),
-    var(--path-mid);
-  border: 4px solid var(--path-dark);
-  border-radius: 50%;
+.location:hover .building-sprite {
+  transform: scale(1.05);
+  filter: drop-shadow(3px 5px 10px rgba(0,0,0,0.6)) brightness(1.08);
+}
+
+/* Capitol building - larger to show detail */
+.capitol-sprite {
+  max-width: 200px;
+}
+
+/* Placeholder for buildings not yet generated */
+.building-placeholder {
+  width: 100px;
+  height: 80px;
+  background: rgba(0,0,0,0.5);
+  border: 3px dashed rgba(255,255,255,0.3);
+  border-radius: 8px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow:
-    inset 0 4px 12px rgba(255,255,255,0.15),
-    inset 0 -4px 12px rgba(0,0,0,0.2),
-    4px 6px 12px rgba(0,0,0,0.35);
+  gap: 4px;
+  backdrop-filter: blur(4px);
 }
 
-.fountain {
-  width: 56px;
-  height: 56px;
-  background:
-    /* Water sparkles */
-    radial-gradient(circle at 35% 35%, rgba(255,255,255,0.7) 2px, transparent 2px),
-    radial-gradient(circle at 65% 45%, rgba(255,255,255,0.5) 2px, transparent 2px),
-    /* Water */
-    radial-gradient(circle, var(--water-light) 25%, var(--water) 55%, var(--water-dark) 100%);
-  border: 4px solid var(--stone);
-  border-radius: 50%;
-  position: relative;
-  box-shadow:
-    inset 0 -10px 20px rgba(0,0,0,0.35),
-    0 3px 6px rgba(0,0,0,0.4);
-  animation: fountain-shimmer 2s ease-in-out infinite;
+.placeholder-icon {
+  font-size: 28px;
 }
 
-/* Fountain center spout */
-.fountain::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
-  background: var(--stone);
-  border-radius: 50%;
-  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+.placeholder-text {
+  font-size: 10px;
+  color: rgba(255,255,255,0.6);
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-/* Water spray effect */
-.fountain::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -70%);
-  width: 6px;
-  height: 16px;
-  background: linear-gradient(to top, var(--water-light), rgba(126,200,227,0.3));
-  border-radius: 50%;
-  box-shadow: 0 0 12px var(--water-light);
-  animation: fountain-spray 1.5s ease-in-out infinite;
-}
-
-@keyframes fountain-shimmer {
-  0%, 100% { box-shadow: inset 0 -10px 20px rgba(0,0,0,0.35), 0 3px 6px rgba(0,0,0,0.4); }
-  50% { box-shadow: inset 0 -10px 20px rgba(0,0,0,0.25), 0 3px 12px rgba(126,200,227,0.5); }
-}
-
-@keyframes fountain-spray {
-  0%, 100% { transform: translate(-50%, -70%) scaleY(1); opacity: 0.9; }
-  50% { transform: translate(-50%, -85%) scaleY(1.3); opacity: 0.5; }
-}
-
-/* ============ CAPITOL BUILDING ============ */
-.capitol {
-  width: 112px;
-  height: 88px;
-  position: relative;
-}
-
-/* Capitol main building */
-.capitol::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 8px;
-  width: 96px;
-  height: 56px;
-  background:
-    /* Windows */
-    radial-gradient(ellipse 8px 10px at 24px 28px, #87ceeb 100%, transparent 100%),
-    radial-gradient(ellipse 8px 10px at 48px 28px, #87ceeb 100%, transparent 100%),
-    radial-gradient(ellipse 8px 10px at 72px 28px, #87ceeb 100%, transparent 100%),
-    /* Columns */
-    repeating-linear-gradient(90deg,
-      var(--white) 0px, var(--white) 10px,
-      var(--cream) 10px, var(--cream) 14px
-    ),
-    /* Base */
-    linear-gradient(180deg, var(--cream) 0%, #e8e0d0 100%);
-  border: 3px solid var(--stone-dark);
-  border-radius: 0;
-  box-shadow: 2px 4px 8px rgba(0,0,0,0.3);
-}
-
-/* Capitol triangular roof */
-.capitol::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-left: 56px solid transparent;
-  border-right: 56px solid transparent;
-  border-bottom: 32px solid var(--cream);
-  filter: drop-shadow(0 -2px 0 var(--stone-dark));
-}
-
-/* ============ ARCHIVE/LIBRARY ============ */
-.archive {
-  width: 96px;
-  height: 80px;
-  background:
-    /* Windows */
-    radial-gradient(ellipse 10px 12px at 24px 44px, #c8b8d8 100%, transparent 100%),
-    radial-gradient(ellipse 10px 12px at 72px 44px, #c8b8d8 100%, transparent 100%),
-    /* Building */
-    linear-gradient(180deg, var(--roof-purple) 0%, var(--roof-purple) 28px, #8070a0 28px, #6a5a8a 100%);
-  border: 3px solid #4a3a6a;
-  border-radius: 4px 4px 0 0;
-  position: relative;
-  box-shadow: inset -4px 0 8px rgba(0,0,0,0.2), 2px 4px 8px rgba(0,0,0,0.3);
-}
-
-.archive::before {
-  content: '📚';
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 18px;
-}
-
-.archive::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 18px;
-  height: 26px;
-  background: var(--wood-dark);
-  border: 2px solid #3a2a10;
-  border-radius: 3px 3px 0 0;
-}
-
-/* ============ CAFE ============ */
-.cafe {
-  width: 80px;
-  height: 72px;
-  position: relative;
-  background: linear-gradient(180deg, var(--roof-orange) 0%, var(--roof-orange) 28px, var(--wood-light) 28px, #a08060 100%);
-  border: 3px solid var(--wood-dark);
-  border-radius: 4px 4px 0 0;
-  box-shadow: inset -4px 0 8px rgba(0,0,0,0.2), 2px 4px 8px rgba(0,0,0,0.3);
-}
-
-.cafe::before {
-  content: '☕';
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 18px;
-}
-
-.cafe::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 18px;
-  height: 24px;
-  background: var(--wood-dark);
-  border: 2px solid #3a2a10;
-  border-radius: 2px 2px 0 0;
-}
-
-/* ============ WORKSHOP ============ */
-.workshop {
-  width: 88px;
-  height: 72px;
-  position: relative;
-  background: linear-gradient(180deg, var(--roof-red) 0%, var(--roof-red) 24px, #8a7060 24px, #6a5040 100%);
-  border: 3px solid #4a3020;
-  border-radius: 4px 4px 0 0;
-  box-shadow: inset -4px 0 8px rgba(0,0,0,0.2), 2px 4px 8px rgba(0,0,0,0.3);
-}
-
-.workshop::before {
-  content: '🔧';
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 16px;
-}
-
-.workshop::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 26px;
-  background: #3a2a10;
-  border: 2px solid #2a1a00;
-  border-radius: 2px 2px 0 0;
-}
-
-/* ============ BULLETIN HALL ============ */
-.bulletin-hall {
-  width: 80px;
-  height: 68px;
-  position: relative;
-  background:
-    /* Window */
-    radial-gradient(ellipse 12px 14px at 50% 44px, #d8e8f0 100%, transparent 100%),
-    /* Building */
-    linear-gradient(180deg, var(--wood-mid) 0%, var(--wood-mid) 24px, var(--cream) 24px, #d8d0c0 100%);
-  border: 3px solid var(--stone-dark);
-  border-radius: 4px 4px 0 0;
-  box-shadow: 2px 4px 8px rgba(0,0,0,0.3);
-}
-
-.bulletin-hall::before {
-  content: '📋';
-  position: absolute;
-  top: 2px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 16px;
-}
-
-.bulletin-hall::after {
-  content: '';
-  position: absolute;
-  bottom: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 22px;
-  background: var(--wood-dark);
-  border: 2px solid #3a2a10;
-  border-radius: 2px 2px 0 0;
-}
-
-/* ============ PARK ============ */
-.park {
-  width: 128px;
-  height: 88px;
-  background:
-    /* Grass texture */
-    radial-gradient(circle at 20% 30%, #6ac050 2px, transparent 2px),
-    radial-gradient(circle at 80% 25%, #6ac050 2px, transparent 2px),
-    radial-gradient(circle at 50% 70%, #6ac050 2px, transparent 2px),
-    radial-gradient(circle at 15% 80%, #6ac050 2px, transparent 2px),
-    radial-gradient(circle at 85% 75%, #6ac050 2px, transparent 2px),
-    var(--grass-dark);
-  border: 3px solid #2a5830;
-  border-radius: 8px;
-  position: relative;
-  box-shadow: inset 0 0 20px rgba(0,0,0,0.15), 2px 4px 8px rgba(0,0,0,0.2);
-}
-
-.tree {
-  position: absolute;
-  width: 28px;
-  height: 36px;
-}
-
-.tree::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 8px;
-  height: 14px;
-  background: linear-gradient(90deg, #6a4a14, var(--wood-mid), #6a4a14);
-  border-radius: 2px;
-}
-
-.tree::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 24px;
-  height: 24px;
-  background: radial-gradient(circle at 40% 40%, #7ed860, #4ea830 60%, #3e8820);
-  border-radius: 50%;
-  box-shadow: 2px 3px 4px rgba(0,0,0,0.3);
-}
-
-.tree-1 { left: 8px; top: 6px; }
-.tree-2 { left: 50px; top: 2px; }
-.tree-3 { left: 92px; top: 8px; }
-
-.pond {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 56px;
-  height: 28px;
-  background:
-    /* Water sparkles */
-    radial-gradient(circle at 30% 40%, rgba(255,255,255,0.6) 2px, transparent 2px),
-    radial-gradient(circle at 70% 50%, rgba(255,255,255,0.4) 2px, transparent 2px),
-    /* Water gradient */
-    radial-gradient(ellipse, var(--water-light) 20%, var(--water) 60%, var(--water-dark) 100%);
-  border: 2px solid var(--water-dark);
-  border-radius: 50%;
-  box-shadow: inset 0 -6px 12px rgba(0,0,0,0.25);
-  animation: pond-shimmer 3s ease-in-out infinite;
-}
-
-@keyframes pond-shimmer {
-  0%, 100% { box-shadow: inset 0 -6px 12px rgba(0,0,0,0.25); }
-  50% { box-shadow: inset 0 -6px 12px rgba(0,0,0,0.15), 0 0 8px rgba(126,200,227,0.3); }
-}
-
-/* ============ HOUSES ============ */
-.houses {
-  width: 120px;
-  height: 80px;
-  position: relative;
-}
-
-.house {
-  position: absolute;
-  width: 52px;
-  height: 48px;
-}
-
-/* House body */
-.house::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 2px;
-  width: 48px;
-  height: 32px;
-  background:
-    /* Window */
-    radial-gradient(ellipse 6px 8px at 32px 14px, #87ceeb 100%, transparent 100%),
-    /* Wall */
-    linear-gradient(180deg, var(--cream) 0%, #e0d8c8 100%);
-  border: 2px solid var(--stone-dark);
-  border-radius: 2px;
-  box-shadow: 1px 2px 4px rgba(0,0,0,0.2);
-}
-
-/* House roof */
-.house::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-left: 26px solid transparent;
-  border-right: 26px solid transparent;
-  border-bottom: 18px solid var(--roof-red);
-}
-
-.house-1 {
-  left: 0;
-  top: 16px;
-}
-
-.house-2 {
-  left: 64px;
-  top: 20px;
-}
-
-.house-2::after {
-  border-bottom-color: var(--roof-blue);
-}
-
-/* ============ DECORATIONS ============ */
-.deco {
-  position: absolute;
-  z-index: 5;
-}
-
-.tree-deco {
-  width: 20px;
-  height: 28px;
-}
-
-.tree-deco::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 6px;
-  height: 10px;
-  background: var(--wood-mid);
-}
-
-.tree-deco::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 18px;
-  height: 18px;
-  background: radial-gradient(circle, var(--grass-mid) 40%, var(--grass-dark) 100%);
-  border-radius: 50%;
-}
-
-.flower-patch {
-  width: 32px;
-  height: 16px;
-  background:
-    radial-gradient(circle at 20% 50%, #ff6b8a 4px, transparent 4px),
-    radial-gradient(circle at 50% 30%, #ffeb3b 4px, transparent 4px),
-    radial-gradient(circle at 80% 60%, #ff6b8a 4px, transparent 4px),
-    radial-gradient(circle at 35% 70%, #fff 3px, transparent 3px);
-}
-
-.fence-h {
-  height: 12px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--wood-mid) 0px,
-    var(--wood-mid) 4px,
-    var(--wood-light) 4px,
-    var(--wood-light) 6px,
-    transparent 6px,
-    transparent 16px
-  );
-  border-bottom: 3px solid var(--wood-dark);
+/* Location name labels */
+.location-label {
+  background: rgba(0,0,0,0.8);
+  color: var(--text-light);
+  padding: 3px 8px;
+  font-size: 10px;
+  border-radius: 3px;
+  margin-top: 6px;
+  white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.2);
 }
 
 /* ============ AGENTS ============ */
 .agents-container {
   position: absolute;
-  bottom: -20px;
+  bottom: -24px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   justify-content: center;
-  max-width: 150px;
+  max-width: 160px;
   z-index: 100;
 }
 
-/* Agent character sprite */
+/* Agent emoji display */
 .agent-avatar {
-  width: 24px;
-  height: 32px;
-  position: relative;
-  cursor: pointer;
-  transition: transform 0.2s;
-  animation: agent-bounce 0.8s ease-in-out infinite;
-}
-
-/* Agent head */
-.agent-avatar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 16px;
-  height: 16px;
-  background: #ffd8b0;
-  border: 2px solid #c0a080;
+  width: 28px;
+  height: 28px;
+  background: rgba(0,0,0,0.7);
+  border: 2px solid rgba(255,255,255,0.4);
   border-radius: 50%;
-}
-
-/* Agent body */
-.agent-avatar::after {
-  content: attr(data-emoji);
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 18px;
-  background: var(--roof-blue);
-  border: 2px solid #3a5090;
-  border-radius: 4px 4px 0 0;
-  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+  animation: agent-idle 2s ease-in-out infinite;
 }
-
-.agent-avatar:nth-child(2n)::after { background: var(--roof-red); border-color: #903030; }
-.agent-avatar:nth-child(3n)::after { background: var(--grass-mid); border-color: #2a5030; }
-.agent-avatar:nth-child(4n)::after { background: var(--roof-purple); border-color: #5a3a8a; }
-.agent-avatar:nth-child(5n)::after { background: var(--roof-orange); border-color: #a06020; }
 
 .agent-avatar:hover {
   transform: scale(1.3);
+  border-color: var(--accent);
   z-index: 200;
 }
 
-.agent-avatar:hover::before {
-  box-shadow: 0 0 8px var(--accent);
-}
-
-/* Agent name tooltip */
-.agent-avatar[data-name]:hover::after {
+/* Agent tooltip on hover */
+.agent-avatar::after {
   content: attr(data-name);
   position: absolute;
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0,0,0,0.9);
+  background: rgba(0,0,0,0.95);
   color: white;
-  padding: 2px 6px;
-  font-size: 8px;
+  padding: 4px 8px;
+  font-size: 10px;
   white-space: nowrap;
-  border-radius: 2px;
-  margin-bottom: 4px;
-  width: auto;
-  height: auto;
-  border: none;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+  border: 1px solid var(--accent);
 }
 
-@keyframes agent-bounce {
+.agent-avatar:hover::after {
+  opacity: 1;
+}
+
+@keyframes agent-idle {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
 }
@@ -751,12 +268,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 0; /* Allow flex children to shrink */
+  min-height: 0;
 }
 
 .info-panel, .activity-panel {
   background: var(--panel-bg);
-  border: 3px solid #2a2e3e;
+  border: 3px solid var(--panel-border);
   border-radius: 4px;
   padding: 12px;
 }
@@ -769,7 +286,7 @@ body {
 
 .activity-panel {
   flex: 0 0 auto;
-  max-height: 180px;
+  max-height: 200px;
 }
 
 .info-panel h2, .activity-panel h2 {
@@ -777,9 +294,10 @@ body {
   color: var(--accent);
   margin-bottom: 8px;
   letter-spacing: 2px;
+  text-transform: uppercase;
 }
 
-/* Agent list in sidebar */
+/* Agent list */
 .agent-list {
   display: flex;
   flex-direction: column;
@@ -794,16 +312,18 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
-  transition: border-color 0.2s;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .agent-card:hover {
   border-color: var(--accent);
+  background: rgba(0,0,0,0.5);
 }
 
 .agent-card .emoji {
-  font-size: 18px;
-  width: 24px;
+  font-size: 20px;
+  width: 28px;
   text-align: center;
 }
 
@@ -813,7 +333,7 @@ body {
 }
 
 .agent-card .name {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-light);
   font-weight: bold;
   white-space: nowrap;
@@ -830,14 +350,15 @@ body {
 }
 
 .agent-card .activity {
-  font-size: 8px;
-  color: var(--grass-light);
+  font-size: 9px;
+  color: var(--grass-mid);
   font-style: italic;
+  margin-top: 2px;
 }
 
 /* Activity feed */
 .feed-container {
-  max-height: 140px;
+  max-height: 160px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -846,10 +367,11 @@ body {
 
 .feed-item {
   font-size: 9px;
-  padding: 4px 8px;
+  padding: 6px 8px;
   background: rgba(0,0,0,0.3);
-  border-radius: 2px;
+  border-radius: 3px;
   border-left: 3px solid var(--accent);
+  line-height: 1.3;
 }
 
 .feed-item.arrival { border-left-color: var(--grass-mid); }
@@ -858,14 +380,14 @@ body {
 .feed-item.interaction { border-left-color: var(--roof-purple); }
 .feed-item.system { border-left-color: var(--text-dim); color: var(--text-dim); }
 
-/* Scrollbar */
+/* ============ SCROLLBAR ============ */
 ::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
 ::-webkit-scrollbar-thumb { background: #3a3e4e; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-/* Responsive */
-@media (max-width: 900px) {
+/* ============ RESPONSIVE ============ */
+@media (max-width: 1000px) {
   .game-container {
     grid-template-columns: 1fr;
     grid-template-rows: auto 1fr auto;
@@ -877,10 +399,30 @@ body {
 
   .side-panel {
     flex-direction: row;
-    max-height: 150px;
+    max-height: 180px;
   }
 
   .info-panel, .activity-panel {
     flex: 1;
+    max-height: 100%;
+  }
+
+  .building-sprite {
+    max-width: 100px;
+  }
+}
+
+@media (max-width: 600px) {
+  .building-sprite {
+    max-width: 80px;
+  }
+
+  .building-placeholder {
+    width: 70px;
+    height: 60px;
+  }
+
+  .placeholder-icon {
+    font-size: 20px;
   }
 }
