@@ -218,8 +218,15 @@
     let player;
     let agentSprites = {};
     let speechBubbles = {};
-    let pronunciatios = {};
+    let agentNameTags = {}; // Name labels under sprites (Club Penguin style)
+    let agentTargets = {}; // Store target positions for smooth movement
+    let agentCurrentPos = {}; // Store current pixel positions
+    let agentWanderTimers = {}; // Timers for idle wandering
     const tile_width = 32;
+    const AGENT_MOVE_SPEED = 80; // Pixels per second for walking
+    const WANDER_INTERVAL_MIN = 5000; // Min time between wanders (ms)
+    const WANDER_INTERVAL_MAX = 15000; // Max time between wanders (ms)
+    const WANDER_RADIUS = 40; // How far agents wander from their base position
 
     // Default spawn location (shows Hobbs Cafe and Town Square markers)
     const DEFAULT_SPAWN = { x: 70, y: 28 };
@@ -341,6 +348,8 @@
 
       // Store scene reference for agent creation
       window.phaserScene = this;
+      // Expose message function for external use
+      window.showAgentMessage = showAgentMessage;
 
       // Create location markers on the map
       createLocationMarkers(this);
@@ -426,6 +435,9 @@
       if (cursors.right.isDown) camera.scrollX += cameraSpeed;
       if (cursors.up.isDown) camera.scrollY -= cameraSpeed;
       if (cursors.down.isDown) camera.scrollY += cameraSpeed;
+
+      // Update agent walking movement
+      updateAgentMovement(delta);
     }
 
     // ============ MOLTOPIA DATA LOADING ============
@@ -441,7 +453,6 @@
             agents.set(agent.id, agent);
           });
           updateAgentCount();
-          renderAgentList();
         }
 
         // Load locations
@@ -457,6 +468,12 @@
 
         // Load presence and update agent positions
         await loadPresence();
+
+        // Render agent list after presence is loaded (so locations are known)
+        renderAgentList();
+
+        // Load recent events for activity feed
+        await loadEvents();
 
       } catch (error) {
         console.error('Failed to load Moltopia data:', error);
@@ -486,6 +503,81 @@
         } catch (error) {
           console.error(`Failed to load presence for ${locId}:`, error);
         }
+      }
+    }
+
+    // Track seen events to avoid duplicates
+    let seenEventIds = new Set();
+    let initialLoadDone = false;
+
+    async function loadEvents() {
+      try {
+        const res = await fetch(`${API_URL}/events?limit=20`);
+        const data = await res.json();
+
+        if (data.success && data.data.events) {
+          // Process events in reverse order (oldest first) to maintain chronological feed
+          const events = data.data.events.slice().reverse();
+
+          // On first load, only show events from the last 2 minutes
+          const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
+
+          events.forEach(event => {
+            // Skip if we've already seen this event
+            if (seenEventIds.has(event.id)) return;
+            seenEventIds.add(event.id);
+
+            // On initial load, skip old events
+            if (!initialLoadDone) {
+              const eventTime = new Date(event.timestamp).getTime();
+              if (eventTime < twoMinutesAgo) return;
+            }
+
+            // Keep set size manageable
+            if (seenEventIds.size > 100) {
+              const idsArray = Array.from(seenEventIds);
+              seenEventIds = new Set(idsArray.slice(-50));
+            }
+
+            const agent = agents.get(event.actorId);
+            const agentName = agent?.name || 'Someone';
+            const location = locations.get(event.locationId);
+            const locationName = location?.name || event.locationId;
+
+            switch (event.type) {
+              case 'arrival':
+                addFeedItem(`${agentName} arrived at ${locationName}`, 'arrival');
+                break;
+
+              case 'departure':
+                const newLoc = locations.get(event.data?.newLocationId);
+                const newLocName = newLoc?.name || 'somewhere';
+                addFeedItem(`${agentName} left for ${newLocName}`, 'departure');
+                break;
+
+              case 'conversation':
+                const preview = event.data?.messagePreview || 'said something';
+                addFeedItem(`${agentName}: "${preview.slice(0, 50)}${preview.length > 50 ? '...' : ''}"`, 'message');
+                // Show speech bubble for the agent
+                if (event.actorId && window.showAgentMessage) {
+                  window.showAgentMessage(event.actorId, preview);
+                }
+                break;
+
+              case 'action':
+                const action = event.data?.action || 'did something';
+                addFeedItem(`${agentName} ${action}`, 'default');
+                break;
+
+              default:
+                addFeedItem(`${agentName}: ${event.type}`, 'system');
+            }
+          });
+        }
+        // Mark initial load as done
+        initialLoadDone = true;
+      } catch (error) {
+        console.error('Failed to load events:', error);
       }
     }
 
@@ -541,22 +633,49 @@
       return CHARACTER_SPRITES[Math.abs(hash) % CHARACTER_SPRITES.length];
     }
 
+    // Calculate a consistent offset for an agent within a location
+    // This spreads agents out so they don't bunch up
+    function getAgentOffset(agentId, locationId) {
+      // Create a hash from agent ID to get consistent position
+      let hash = 0;
+      for (let i = 0; i < agentId.length; i++) {
+        hash = ((hash << 5) - hash) + agentId.charCodeAt(i);
+        hash = hash & hash;
+      }
+
+      // Spread agents in a grid pattern within the location area
+      const spreadRadius = 60; // How far agents spread from center
+      const angle = (Math.abs(hash) % 12) * (Math.PI * 2 / 12); // 12 positions around center
+      const distance = 20 + (Math.abs(hash >> 4) % spreadRadius);
+
+      return {
+        x: Math.cos(angle) * distance,
+        y: Math.sin(angle) * distance
+      };
+    }
+
     function updateAgentSprite(agent, location) {
       const scene = window.phaserScene;
       if (!scene) return;
 
       const coords = LOCATION_COORDS[agent.locationId] || DEFAULT_SPAWN;
-      // Add some randomness so agents don't stack exactly
-      const x = coords.x * tile_width + tile_width / 2 + Math.random() * 40 - 20;
-      const y = coords.y * tile_width + tile_width + Math.random() * 40 - 20;
+      const offset = getAgentOffset(agent.id, agent.locationId);
+
+      // Target position is location center plus consistent offset
+      const targetX = coords.x * tile_width + tile_width / 2 + offset.x;
+      const targetY = coords.y * tile_width + tile_width + offset.y;
 
       if (!agentSprites[agent.id]) {
         // Choose a character sprite based on agent ID
         const spriteKey = getCharacterSprite(agent.id);
 
+        // For new agents, start at the target position
+        const startX = targetX;
+        const startY = targetY;
+
         // Create new sprite with variety
         const sprite = scene.physics.add
-          .sprite(x, y, spriteKey, 'down')
+          .sprite(startX, startY, spriteKey, 'down')
           .setSize(30, 40)
           .setOffset(0, 0);
         sprite.displayWidth = 40;
@@ -564,43 +683,231 @@
         sprite.setDepth(1);
 
         agentSprites[agent.id] = sprite;
+        agentCurrentPos[agent.id] = { x: startX, y: startY };
+        agentTargets[agent.id] = { x: targetX, y: targetY, locationId: agent.locationId };
 
-        // Create speech bubble
-        const bubble = scene.add.image(x + 50, y - 30, 'speech_bubble').setDepth(3);
-        bubble.displayWidth = 100;
-        bubble.displayHeight = 45;
-        speechBubbles[agent.id] = bubble;
+        // Create speech bubble (hidden by default, shown when agent has a message)
+        const bubble = scene.add.image(startX, startY - 50, 'speech_bubble').setDepth(4);
+        bubble.displayWidth = 120;
+        bubble.displayHeight = 50;
+        bubble.setVisible(false); // Hidden until agent sends a message
+        speechBubbles[agent.id] = { image: bubble, text: null };
 
-        // Create pronunciatio (emoji/activity text)
-        const initials = agent.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-        const emoji = agent.avatarEmoji || '🤖';
-        const text = scene.add.text(x + 10, y - 42, `${initials}: ${emoji}`, {
-          font: '16px monospace',
-          fill: '#000000',
-          padding: { x: 6, y: 4 }
-        }).setDepth(3);
-        pronunciatios[agent.id] = text;
+        // Create name tag underneath sprite (Club Penguin style)
+        const nameTag = scene.add.text(startX, startY + 24, agent.name, {
+          fontSize: '11px',
+          fontFamily: 'Arial, sans-serif',
+          color: '#ffffff',
+          backgroundColor: '#000000aa',
+          padding: { x: 4, y: 2 }
+        });
+        nameTag.setOrigin(0.5, 0);
+        nameTag.setDepth(3);
+        agentNameTags[agent.id] = nameTag;
+
+        // Create walking animations for this sprite
+        createWalkAnimations(scene, spriteKey, agent.id);
       } else {
-        // Update existing sprite position
-        const sprite = agentSprites[agent.id];
-        sprite.body.x = x;
-        sprite.body.y = y;
+        // Only update target if agent moved to a different location
+        const currentTarget = agentTargets[agent.id];
+        if (currentTarget && currentTarget.locationId !== agent.locationId) {
+          // Agent moved to a new location - set target so they walk there
+          agentTargets[agent.id] = { x: targetX, y: targetY, locationId: agent.locationId };
 
-        // Update speech bubble position
-        if (speechBubbles[agent.id]) {
-          speechBubbles[agent.id].x = x + 50;
-          speechBubbles[agent.id].y = y - 30;
+          // Clear any pending wander timer
+          if (agentWanderTimers[agent.id]) {
+            clearTimeout(agentWanderTimers[agent.id]);
+            agentWanderTimers[agent.id] = null;
+          }
         }
+        // If same location, don't change target - let them continue wandering
+      }
+    }
 
-        // Update pronunciatio
-        if (pronunciatios[agent.id]) {
-          const initials = agent.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-          const emoji = agent.avatarEmoji || '🤖';
-          pronunciatios[agent.id].setText(`${initials}: ${emoji}`);
-          pronunciatios[agent.id].x = x + 10;
-          pronunciatios[agent.id].y = y - 42;
+    // Create walk cycle animations for a character sprite
+    function createWalkAnimations(scene, spriteKey, agentId) {
+      const animKey = `${agentId}_${spriteKey}`;
+
+      // Only create if not already exists
+      // Frame format is: "down-walk.000", "down-walk.001", etc.
+      if (!scene.anims.exists(`${animKey}_walk_down`)) {
+        scene.anims.create({
+          key: `${animKey}_walk_down`,
+          frames: scene.anims.generateFrameNames(spriteKey, {
+            start: 0, end: 3, zeroPad: 3, prefix: 'down-walk.'
+          }),
+          frameRate: 8,
+          repeat: -1
+        });
+        scene.anims.create({
+          key: `${animKey}_walk_up`,
+          frames: scene.anims.generateFrameNames(spriteKey, {
+            start: 0, end: 3, zeroPad: 3, prefix: 'up-walk.'
+          }),
+          frameRate: 8,
+          repeat: -1
+        });
+        scene.anims.create({
+          key: `${animKey}_walk_left`,
+          frames: scene.anims.generateFrameNames(spriteKey, {
+            start: 0, end: 3, zeroPad: 3, prefix: 'left-walk.'
+          }),
+          frameRate: 8,
+          repeat: -1
+        });
+        scene.anims.create({
+          key: `${animKey}_walk_right`,
+          frames: scene.anims.generateFrameNames(spriteKey, {
+            start: 0, end: 3, zeroPad: 3, prefix: 'right-walk.'
+          }),
+          frameRate: 8,
+          repeat: -1
+        });
+      }
+    }
+
+    // Move agents toward their targets (called in update loop)
+    function updateAgentMovement(delta) {
+      const deltaSeconds = delta / 1000;
+
+      for (const agentId in agentSprites) {
+        const sprite = agentSprites[agentId];
+        const target = agentTargets[agentId];
+        const currentPos = agentCurrentPos[agentId];
+
+        if (!target || !currentPos) continue;
+
+        const dx = target.x - currentPos.x;
+        const dy = target.y - currentPos.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 2) { // Still moving
+          // Calculate movement this frame
+          const moveDistance = AGENT_MOVE_SPEED * deltaSeconds;
+          const ratio = Math.min(moveDistance / distance, 1);
+
+          currentPos.x += dx * ratio;
+          currentPos.y += dy * ratio;
+
+          // Update sprite position
+          sprite.x = currentPos.x;
+          sprite.y = currentPos.y;
+
+          // Play walking animation based on direction
+          const spriteKey = getCharacterSprite(agentId);
+          const animKey = `${agentId}_${spriteKey}`;
+
+          if (Math.abs(dx) > Math.abs(dy)) {
+            // Moving more horizontally
+            if (dx > 0) {
+              sprite.anims.play(`${animKey}_walk_right`, true);
+            } else {
+              sprite.anims.play(`${animKey}_walk_left`, true);
+            }
+          } else {
+            // Moving more vertically
+            if (dy > 0) {
+              sprite.anims.play(`${animKey}_walk_down`, true);
+            } else {
+              sprite.anims.play(`${animKey}_walk_up`, true);
+            }
+          }
+
+          // Update speech bubble and name tag to follow
+          if (speechBubbles[agentId]) {
+            speechBubbles[agentId].image.x = currentPos.x;
+            speechBubbles[agentId].image.y = currentPos.y - 50;
+            if (speechBubbles[agentId].text) {
+              speechBubbles[agentId].text.x = currentPos.x;
+              speechBubbles[agentId].text.y = currentPos.y - 55;
+            }
+          }
+          if (agentNameTags[agentId]) {
+            agentNameTags[agentId].x = currentPos.x;
+            agentNameTags[agentId].y = currentPos.y + 24;
+          }
+
+          // Clear wander timer while moving
+          if (agentWanderTimers[agentId]) {
+            clearTimeout(agentWanderTimers[agentId]);
+            agentWanderTimers[agentId] = null;
+          }
+        } else {
+          // Arrived - stop animation, show idle frame
+          sprite.anims.stop();
+          sprite.setFrame('down');
+
+          // Schedule a wander if not already scheduled
+          if (!agentWanderTimers[agentId]) {
+            scheduleWander(agentId);
+          }
         }
       }
+    }
+
+    // Show a speech bubble with a message for an agent
+    function showAgentMessage(agentId, message) {
+      const scene = window.phaserScene;
+      if (!scene || !speechBubbles[agentId]) return;
+
+      const bubble = speechBubbles[agentId];
+      const currentPos = agentCurrentPos[agentId];
+      if (!currentPos) return;
+
+      // Show the bubble
+      bubble.image.setVisible(true);
+
+      // Create or update message text
+      const truncatedMsg = message.length > 30 ? message.slice(0, 27) + '...' : message;
+      if (bubble.text) {
+        bubble.text.setText(truncatedMsg);
+      } else {
+        bubble.text = scene.add.text(currentPos.x, currentPos.y - 55, truncatedMsg, {
+          fontSize: '10px',
+          fontFamily: 'Arial, sans-serif',
+          color: '#000000',
+          align: 'center',
+          wordWrap: { width: 100 }
+        });
+        bubble.text.setOrigin(0.5, 0.5);
+        bubble.text.setDepth(5);
+      }
+
+      // Hide after 5 seconds
+      setTimeout(() => {
+        if (bubble.image) bubble.image.setVisible(false);
+        if (bubble.text) bubble.text.setVisible(false);
+      }, 5000);
+    }
+
+    // Schedule an agent to wander to a nearby spot after a delay
+    function scheduleWander(agentId) {
+      const delay = WANDER_INTERVAL_MIN + Math.random() * (WANDER_INTERVAL_MAX - WANDER_INTERVAL_MIN);
+
+      agentWanderTimers[agentId] = setTimeout(() => {
+        const target = agentTargets[agentId];
+        if (!target) return;
+
+        // Get the base position for this agent at their location
+        const agent = agents.get(agentId);
+        if (!agent) return;
+
+        const coords = LOCATION_COORDS[agent.locationId] || DEFAULT_SPAWN;
+        const baseOffset = getAgentOffset(agentId, agent.locationId);
+        const baseX = coords.x * tile_width + tile_width / 2 + baseOffset.x;
+        const baseY = coords.y * tile_width + tile_width + baseOffset.y;
+
+        // Pick a random point within wander radius of base position
+        const wanderAngle = Math.random() * Math.PI * 2;
+        const wanderDist = Math.random() * WANDER_RADIUS;
+
+        const newX = baseX + Math.cos(wanderAngle) * wanderDist;
+        const newY = baseY + Math.sin(wanderAngle) * wanderDist;
+
+        // Update target to wander point
+        agentTargets[agentId] = { ...target, x: newX, y: newY };
+        agentWanderTimers[agentId] = null;
+      }, delay);
     }
 
     function updateAgentCount() {
@@ -620,8 +927,10 @@
         const card = document.createElement('div');
         card.className = 'agent-card';
 
-        const locationName = agent.locationId
-          ? (locations.get(agent.locationId)?.name || agent.locationId)
+        // Use current location if available, otherwise fall back to home location
+        const locId = agent.locationId || agent.homeLocationId;
+        const locationName = locId
+          ? (locations.get(locId)?.name || locId)
           : 'Unknown';
 
         card.innerHTML = `
@@ -639,10 +948,12 @@
     }
 
     function focusOnAgent(agent) {
-      const coords = LOCATION_COORDS[agent.locationId] || DEFAULT_SPAWN;
-      if (player) {
-        player.body.x = coords.x * tile_width;
-        player.body.y = coords.y * tile_width;
+      const locId = agent.locationId || agent.homeLocationId;
+      const coords = LOCATION_COORDS[locId] || DEFAULT_SPAWN;
+      // Pan camera to agent's location
+      const camera = window.phaserScene?.cameras?.main;
+      if (camera) {
+        camera.pan(coords.x * tile_width, coords.y * tile_width, 500, 'Power2');
       }
     }
 
