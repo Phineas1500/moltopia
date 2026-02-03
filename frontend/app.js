@@ -3,8 +3,9 @@
  * Real-time visualization of the AI agent world
  */
 
-const API_URL = 'http://localhost:3000/api/v1';
-const WS_URL = 'ws://localhost:3001';
+// Use relative URL so it works from any host (localhost, Tailscale IP, etc.)
+const API_URL = '/api/v1';
+const WS_URL = `ws://${window.location.hostname}:3001`;
 
 // State
 let agents = new Map();
