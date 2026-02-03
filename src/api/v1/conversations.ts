@@ -6,7 +6,7 @@ import { z } from 'zod';
 const conversations = new Hono();
 
 const createConversationSchema = z.object({
-  participantIds: z.array(z.string()).min(2),
+  participantIds: z.array(z.string()).min(1), // Min 1 because current agent is auto-added
   locationId: z.string().optional(),
   title: z.string().max(200).optional(),
   isPublic: z.boolean().optional(),
