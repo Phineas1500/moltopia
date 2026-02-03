@@ -25,8 +25,8 @@ app.get('/health', (c) => {
   });
 });
 
-// Serve frontend static files
-app.use('/*', serveStatic({ root: './frontend' }));
+// Serve frontend static files (using Phaser-based frontend with Smallville world)
+app.use('/*', serveStatic({ root: './frontend-phaser' }));
 
 // Compact middleware for API routes only
 app.use('/api/*', compactMiddleware);
@@ -35,7 +35,7 @@ app.use('/api/*', compactMiddleware);
 app.route('/api', api);
 
 // Serve index.html for root
-app.get('/', serveStatic({ path: './frontend/index.html' }));
+app.get('/', serveStatic({ path: './frontend-phaser/index.html' }));
 
 // 404 handler for API
 app.notFound((c) => {
