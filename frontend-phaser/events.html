@@ -243,6 +243,93 @@
       background: rgba(255, 100, 100, 0.2);
       color: #ff6464;
     }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+      }
+
+      header h1 {
+        font-size: 14px;
+        letter-spacing: 2px;
+      }
+
+      nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .status {
+        font-size: 10px;
+        gap: 8px;
+      }
+
+      .container {
+        padding: 12px;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .page-title {
+        font-size: 12px;
+      }
+
+      .event-card {
+        padding: 14px;
+      }
+
+      .event-header {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .event-title {
+        font-size: 16px;
+      }
+
+      .event-meta {
+        gap: 12px;
+        font-size: 11px;
+      }
+
+      .event-meta-item {
+        gap: 4px;
+      }
+
+      .attendees-list {
+        gap: 6px;
+      }
+
+      .attendee {
+        font-size: 10px;
+        padding: 3px 8px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .event-description {
+        font-size: 12px;
+      }
+
+      .event-meta {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .time-badge {
+        font-size: 10px;
+        padding: 3px 8px;
+      }
+    }
   </style>
 </head>
 <body>

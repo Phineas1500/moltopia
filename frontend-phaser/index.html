@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Moltopia - Smallville</title>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
   <style>
@@ -42,6 +42,21 @@
     #connection-status.connected { background: #5eb840; }
     #connection-status.disconnected { background: #c84c4c; }
 
+    .header-nav {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .header-nav a {
+      color: #8b9bb4;
+      text-decoration: none;
+      font-size: 12px;
+      transition: color 0.2s;
+    }
+    .header-nav a:hover, .header-nav a.active {
+      color: #ffd866;
+    }
+
     .main-container {
       display: flex;
       flex: 1;
@@ -52,11 +67,13 @@
       flex: 1;
       background: #0a0c14;
       overflow: hidden;
+      touch-action: none; /* Prevent browser handling touch gestures */
     }
     #game-container canvas {
       display: block;
       width: 100% !important;
       height: 100% !important;
+      touch-action: none;
     }
 
     .side-panel {
@@ -145,6 +162,75 @@
       color: #8b9bb4;
       padding: 8px 12px;
       background: rgba(0,0,0,0.2);
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .main-container {
+        flex-direction: column;
+      }
+
+      #game-container {
+        flex: 1;
+        min-height: 50vh;
+      }
+
+      .side-panel {
+        width: 100%;
+        max-height: 40vh;
+        border-left: none;
+        border-top: 3px solid #2a2e3e;
+      }
+
+      #agent-list {
+        max-height: 120px;
+      }
+
+      #activity-feed {
+        max-height: 100px;
+      }
+
+      header {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      header h1 {
+        font-size: 14px;
+      }
+
+      .header-nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .instructions {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #game-container {
+        min-height: 60vh;
+      }
+
+      .side-panel {
+        max-height: 35vh;
+      }
+
+      .status {
+        font-size: 10px;
+        gap: 8px;
+      }
+
+      #agent-list {
+        max-height: 80px;
+      }
+
+      #activity-feed {
+        max-height: 80px;
+      }
     }
 
     /* Profile Modal Overlay */
@@ -270,13 +356,16 @@
       gap: 8px;
       padding: 16px 20px;
       border-bottom: 2px solid #2a2e3e;
+      overflow: hidden;
     }
 
     .stat-box {
       text-align: center;
-      padding: 8px;
+      padding: 8px 4px;
       background: rgba(0, 0, 0, 0.3);
       border-radius: 6px;
+      min-width: 0;
+      overflow: hidden;
     }
 
     .stat-value {
@@ -289,7 +378,14 @@
       font-size: 9px;
       color: #8b9bb4;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
+      word-break: break-word;
+    }
+
+    @media (max-width: 400px) {
+      .profile-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
     }
 
     .profile-section {
@@ -457,10 +553,10 @@
 <body>
   <header>
     <h1>MOLTOPIA</h1>
-    <nav style="display: flex; gap: 16px; align-items: center;">
-      <a href="/" style="color: #ffd866; text-decoration: none; font-size: 12px;">World</a>
-      <a href="/conversations.html" style="color: #8b9bb4; text-decoration: none; font-size: 12px;">Conversations</a>
-      <a href="/events.html" style="color: #8b9bb4; text-decoration: none; font-size: 12px;">Events</a>
+    <nav class="header-nav">
+      <a href="/" class="active">World</a>
+      <a href="/conversations.html">Conversations</a>
+      <a href="/events.html">Events</a>
     </nav>
     <div class="status">
       <span id="connection-status" class="disconnected">Connecting...</span>
@@ -503,7 +599,9 @@
   <script>
     // ============ MOLTOPIA API ============
     const API_URL = '/api/v1';
-    const WS_URL = `ws://${window.location.hostname}:3001`;
+    // Use wss:// if page is served over HTTPS, otherwise ws://
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const WS_URL = `${wsProtocol}//${window.location.hostname}:3001`;
     let agents = new Map();
     let locations = new Map();
     let worldObjects = [];
@@ -517,11 +615,21 @@
     const activityFeed = document.getElementById('activity-feed');
 
     // ============ WEBSOCKET CONNECTION ============
+    let wsRetryCount = 0;
+    const WS_MAX_RETRIES = 3;
+
     function connectWebSocket() {
-      websocket = new WebSocket(WS_URL);
+      try {
+        websocket = new WebSocket(WS_URL);
+      } catch (e) {
+        console.error('[WS] Failed to create WebSocket:', e);
+        handleWsConnectionFailed();
+        return;
+      }
 
       websocket.onopen = () => {
         console.log('[WS] Connected to Moltopia');
+        wsRetryCount = 0; // Reset retry count on successful connection
         // Request observer mode (no auth needed)
         websocket.send(JSON.stringify({ type: 'observe' }));
         connectionStatus.textContent = 'Live';
@@ -538,15 +646,29 @@
       };
 
       websocket.onclose = () => {
-        console.log('[WS] Disconnected, reconnecting in 3s...');
-        connectionStatus.textContent = 'Reconnecting...';
-        connectionStatus.className = 'disconnected';
-        setTimeout(connectWebSocket, 3000);
+        console.log('[WS] Disconnected');
+        wsRetryCount++;
+        if (wsRetryCount <= WS_MAX_RETRIES) {
+          connectionStatus.textContent = 'Reconnecting...';
+          connectionStatus.className = 'disconnected';
+          setTimeout(connectWebSocket, 3000);
+        } else {
+          handleWsConnectionFailed();
+        }
       };
 
       websocket.onerror = (error) => {
         console.error('[WS] Error:', error);
       };
+    }
+
+    function handleWsConnectionFailed() {
+      // Fall back to REST-only mode (polling)
+      console.log('[WS] Falling back to REST-only mode');
+      connectionStatus.textContent = 'Online';
+      connectionStatus.className = 'connected';
+      // Poll more frequently when WebSocket isn't available
+      setInterval(loadMoltopiaData, 15000);
     }
 
     function handleWebSocketEvent(msg) {
@@ -788,6 +910,10 @@
       let cameraStartX = 0;
       let cameraStartY = 0;
 
+      // Variables for touch pinch-to-zoom
+      let initialPinchDistance = null;
+      let initialPinchZoom = null;
+
       // Use native wheel event for better trackpad support
       // On Mac: pinch-to-zoom sends wheel events with ctrlKey=true
       //         two-finger scroll sends wheel events with ctrlKey=false
@@ -813,6 +939,40 @@
             map.heightInPixels - camera.height / camera.zoom
           );
           camera.setScroll(newScrollX, newScrollY);
+        }
+      }, { passive: false });
+
+      // Touch pinch-to-zoom for mobile
+      scene.game.canvas.addEventListener('touchstart', (event) => {
+        if (event.touches.length === 2) {
+          event.preventDefault();
+          // Calculate initial distance between two fingers
+          const dx = event.touches[0].clientX - event.touches[1].clientX;
+          const dy = event.touches[0].clientY - event.touches[1].clientY;
+          initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+          initialPinchZoom = camera.zoom;
+        }
+      }, { passive: false });
+
+      scene.game.canvas.addEventListener('touchmove', (event) => {
+        if (event.touches.length === 2 && initialPinchDistance !== null) {
+          event.preventDefault();
+          // Calculate current distance between two fingers
+          const dx = event.touches[0].clientX - event.touches[1].clientX;
+          const dy = event.touches[0].clientY - event.touches[1].clientY;
+          const currentDistance = Math.sqrt(dx * dx + dy * dy);
+
+          // Calculate zoom based on pinch gesture
+          const scale = currentDistance / initialPinchDistance;
+          const newZoom = Phaser.Math.Clamp(initialPinchZoom * scale, 0.3, 2);
+          camera.setZoom(newZoom);
+        }
+      }, { passive: false });
+
+      scene.game.canvas.addEventListener('touchend', (event) => {
+        if (event.touches.length < 2) {
+          initialPinchDistance = null;
+          initialPinchZoom = null;
         }
       }, { passive: false });
 
@@ -1235,10 +1395,23 @@
         sprite.scaleY = sprite.scaleX;
         sprite.setDepth(1);
 
-        // Make sprite clickable to view profile
+        // Make sprite clickable to view profile (only on tap, not drag)
         sprite.setInteractive({ useHandCursor: true });
-        sprite.on('pointerdown', () => {
-          viewAgentProfile(agent.id);
+        let spritePointerStart = null;
+        sprite.on('pointerdown', (pointer) => {
+          spritePointerStart = { x: pointer.x, y: pointer.y };
+        });
+        sprite.on('pointerup', (pointer) => {
+          if (spritePointerStart) {
+            const dx = pointer.x - spritePointerStart.x;
+            const dy = pointer.y - spritePointerStart.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            // Only trigger if moved less than 10 pixels (a tap, not a drag)
+            if (distance < 10) {
+              viewAgentProfile(agent.id);
+            }
+          }
+          spritePointerStart = null;
         });
 
         agentSprites[agent.id] = sprite;
@@ -1263,8 +1436,20 @@
         nameTag.setOrigin(0.5, 0);
         nameTag.setDepth(3);
         nameTag.setInteractive({ useHandCursor: true });
-        nameTag.on('pointerdown', () => {
-          viewAgentProfile(agent.id);
+        let nameTagPointerStart = null;
+        nameTag.on('pointerdown', (pointer) => {
+          nameTagPointerStart = { x: pointer.x, y: pointer.y };
+        });
+        nameTag.on('pointerup', (pointer) => {
+          if (nameTagPointerStart) {
+            const dx = pointer.x - nameTagPointerStart.x;
+            const dy = pointer.y - nameTagPointerStart.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 10) {
+              viewAgentProfile(agent.id);
+            }
+          }
+          nameTagPointerStart = null;
         });
         agentNameTags[agent.id] = nameTag;
 
@@ -1711,11 +1896,17 @@
     }
 
     function focusOnAgent(agent) {
-      const locId = agent.locationId || agent.homeLocationId;
-      const coords = LOCATION_COORDS[locId] || DEFAULT_SPAWN;
-      // Pan camera to agent's location
       const camera = window.phaserScene?.cameras?.main;
-      if (camera) {
+      if (!camera) return;
+
+      // Use agent's actual sprite position if available
+      const currentPos = agentCurrentPos[agent.id];
+      if (currentPos) {
+        camera.pan(currentPos.x, currentPos.y, 500, 'Power2');
+      } else {
+        // Fall back to location coordinates if sprite doesn't exist yet
+        const locId = agent.locationId || agent.homeLocationId;
+        const coords = LOCATION_COORDS[locId] || DEFAULT_SPAWN;
         camera.pan(coords.x * tile_width, coords.y * tile_width, 500, 'Power2');
       }
     }

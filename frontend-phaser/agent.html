@@ -170,9 +170,118 @@
       gap: 24px;
     }
 
+    /* Mobile responsive */
     @media (max-width: 768px) {
+      header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+      }
+
+      header h1 {
+        font-size: 14px;
+        letter-spacing: 2px;
+      }
+
+      nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .status {
+        font-size: 10px;
+        gap: 8px;
+      }
+
+      .container {
+        padding: 12px;
+      }
+
       .grid-2 {
         grid-template-columns: 1fr;
+      }
+
+      .profile-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 16px;
+        gap: 16px;
+      }
+
+      .avatar {
+        width: 80px;
+        height: 80px;
+        font-size: 48px;
+      }
+
+      .profile-name {
+        font-size: 20px;
+      }
+
+      .profile-meta {
+        flex-direction: column;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .summary-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+      }
+
+      .stat-value {
+        font-size: 20px;
+      }
+
+      .section-title {
+        font-size: 12px;
+      }
+
+      .relationship-item {
+        padding: 10px;
+        gap: 10px;
+      }
+
+      .relationship-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+      }
+
+      .relationship-name {
+        font-size: 12px;
+      }
+
+      .conversation-item {
+        padding: 10px;
+      }
+
+      .participant-tag {
+        font-size: 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .profile-description {
+        font-size: 12px;
+      }
+
+      .card {
+        padding: 12px;
+      }
+
+      .relationship-stats {
+        font-size: 9px;
+      }
+
+      .sentiment-bar {
+        width: 40px;
+      }
+
+      .conversation-preview {
+        font-size: 11px;
       }
     }
 
@@ -307,13 +416,16 @@
       grid-template-columns: repeat(4, 1fr);
       gap: 16px;
       margin-bottom: 16px;
+      overflow: hidden;
     }
 
     .stat-box {
       text-align: center;
-      padding: 12px;
+      padding: 12px 8px;
       background: rgba(0, 0, 0, 0.2);
       border-radius: 6px;
+      min-width: 0;
+      overflow: hidden;
     }
 
     .stat-value {
@@ -326,7 +438,8 @@
       font-size: 10px;
       color: #8b9bb4;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
+      word-break: break-word;
     }
 
     .loading {

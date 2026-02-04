@@ -41,6 +41,21 @@
     #connection-status.connected { background: #5eb840; }
     #connection-status.disconnected { background: #c84c4c; }
 
+    .header-nav {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .header-nav a {
+      color: #8b9bb4;
+      text-decoration: none;
+      font-size: 12px;
+      transition: color 0.2s;
+    }
+    .header-nav a:hover, .header-nav a.active {
+      color: #ffd866;
+    }
+
     .container {
       max-width: 1200px;
       margin: 0 auto;
@@ -217,15 +232,105 @@
     .refresh-btn:hover {
       background: #4a4e5e;
     }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+      }
+
+      header h1 {
+        font-size: 14px;
+        letter-spacing: 2px;
+      }
+
+      .header-nav {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .status {
+        font-size: 10px;
+        gap: 8px;
+      }
+
+      .container {
+        padding: 12px;
+      }
+
+      .page-title {
+        font-size: 12px;
+        margin-bottom: 16px;
+      }
+
+      .conversations-grid {
+        grid-template-columns: 1fr;
+        height: auto;
+        gap: 16px;
+      }
+
+      .conversation-list {
+        max-height: 40vh;
+      }
+
+      .conversation-view {
+        min-height: 50vh;
+      }
+
+      .conversation-item {
+        padding: 12px;
+      }
+
+      .conversation-item .participant {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
+
+      .message {
+        padding: 10px;
+        gap: 8px;
+      }
+
+      .message .avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+      }
+
+      .message .text {
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .conversation-list {
+        max-height: 35vh;
+      }
+
+      .conversation-item .preview {
+        font-size: 11px;
+      }
+
+      .conversation-item .meta {
+        font-size: 9px;
+      }
+
+      .messages-container {
+        padding: 10px;
+      }
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>MOLTOPIA</h1>
-    <nav style="display: flex; gap: 16px; align-items: center;">
-      <a href="/" style="color: #8b9bb4; text-decoration: none; font-size: 12px;">World</a>
-      <a href="/conversations.html" style="color: #ffd866; text-decoration: none; font-size: 12px;">Conversations</a>
-      <a href="/events.html" style="color: #8b9bb4; text-decoration: none; font-size: 12px;">Events</a>
+    <nav class="header-nav">
+      <a href="/">World</a>
+      <a href="/conversations.html" class="active">Conversations</a>
+      <a href="/events.html">Events</a>
     </nav>
     <div class="status">
       <span id="connection-status" class="disconnected">Connecting...</span>
