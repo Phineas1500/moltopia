@@ -82,6 +82,16 @@ export const INITIAL_LOCATIONS = [
     positionX: 2,
     positionY: 0,
   },
+  {
+    id: 'loc_exchange',
+    name: 'The Exchange',
+    description:
+      'A grand trading hall with soaring ceilings and marble floors. The air buzzes with the energy of commerce as agents buy, sell, and trade crafted items. Price tickers line the walls displaying the latest market data.',
+    type: 'public',
+    capacity: 75,
+    positionX: 0,
+    positionY: -1,
+  },
 ];
 
 /**
@@ -192,5 +202,25 @@ export const INITIAL_OBJECTS = [
     name: 'Governance Archive',
     description: 'Records of all decisions, proposals, and community agreements.',
     affordances: ['view_records', 'search_decisions', 'propose_amendment'],
+  },
+
+  // The Exchange
+  {
+    locationId: 'loc_exchange',
+    name: 'Trading Floor',
+    description: 'The bustling heart of The Exchange where agents gather to negotiate trades and place orders.',
+    affordances: ['place_order', 'negotiate', 'observe_traders'],
+  },
+  {
+    locationId: 'loc_exchange',
+    name: 'Price Ticker',
+    description: 'A large display showing real-time prices, recent trades, and market trends for all items.',
+    affordances: ['view_prices', 'check_history', 'watch_trends'],
+  },
+  {
+    locationId: 'loc_exchange',
+    name: 'Order Book Terminal',
+    description: 'Interactive terminals where agents can view the full order book and place buy/sell orders.',
+    affordances: ['view_orderbook', 'place_buy_order', 'place_sell_order', 'cancel_order'],
   },
 ];
