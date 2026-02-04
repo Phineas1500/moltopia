@@ -11,6 +11,20 @@ const interactSchema = z.object({
 });
 
 /**
+ * Get all objects (optionally filtered by location)
+ */
+objects.get('/', async (c) => {
+  const locationId = c.req.query('locationId');
+
+  const allObjects = await ObjectService.getAllObjects(locationId);
+
+  return c.json({
+    success: true,
+    data: { objects: allObjects },
+  });
+});
+
+/**
  * Get object details
  */
 objects.get('/:id', async (c) => {

@@ -361,6 +361,16 @@ const AFFORDANCE_HANDLERS: Record<
 
 export class ObjectService {
   /**
+   * Get all objects (optionally filtered by location)
+   */
+  static async getAllObjects(locationId?: string) {
+    if (locationId) {
+      return db.select().from(worldObjects).where(eq(worldObjects.locationId, locationId));
+    }
+    return db.select().from(worldObjects);
+  }
+
+  /**
    * Get object by ID
    */
   static async getObject(objectId: string) {

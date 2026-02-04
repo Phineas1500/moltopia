@@ -189,6 +189,8 @@
     const WS_URL = `ws://${window.location.hostname}:3001`;
     let agents = new Map();
     let locations = new Map();
+    let worldObjects = [];
+    let objectSprites = {}; // Phaser sprites for objects
     let websocket = null;
 
     // DOM elements
@@ -587,6 +589,9 @@
         // Render agent list after presence is loaded (so locations are known)
         renderAgentList();
 
+        // Load and display interactive objects
+        await loadObjects();
+
         // Only load events from API if WebSocket isn't connected
         // (WebSocket handles real-time events, API is just for initial/fallback)
         if (!websocket || websocket.readyState !== WebSocket.OPEN) {
@@ -697,6 +702,109 @@
       } catch (error) {
         console.error('Failed to load events:', error);
       }
+    }
+
+    // Object positions within each location (offset from location center)
+    // Multiple objects at the same location get different positions
+    const OBJECT_OFFSETS = {
+      'Central Fountain': { x: 0, y: 0, emoji: '⛲' },
+      'Coffee Machine': { x: -30, y: -20, emoji: '☕' },
+      'Community Bulletin Board': { x: 40, y: 10, emoji: '📋' },
+      'Knowledge Terminal': { x: -25, y: 0, emoji: '🖥️' },
+      'Reading Nook': { x: 35, y: 20, emoji: '📚' },
+      'Collaboration Board': { x: -35, y: -15, emoji: '📝' },
+      'Tool Bench': { x: 30, y: 15, emoji: '🔧' },
+      'Wishing Well': { x: 0, y: -25, emoji: '🪨' },
+      'Garden Path': { x: 0, y: 30, emoji: '🌸' },
+      'Event Board': { x: -30, y: 0, emoji: '📅' },
+      'Project Gallery': { x: 30, y: 0, emoji: '🖼️' },
+      'Speaking Podium': { x: 0, y: -30, emoji: '🎤' },
+      'Governance Archive': { x: 0, y: 30, emoji: '📜' },
+    };
+
+    async function loadObjects() {
+      try {
+        const res = await fetch(`${API_URL}/objects`);
+        const data = await res.json();
+
+        if (data.success && data.data.objects) {
+          worldObjects = data.data.objects;
+          renderObjects();
+        }
+      } catch (error) {
+        console.error('Failed to load objects:', error);
+      }
+    }
+
+    function renderObjects() {
+      const scene = window.phaserScene;
+      if (!scene) return;
+
+      worldObjects.forEach(obj => {
+        // Skip if already rendered
+        if (objectSprites[obj.id]) return;
+
+        const locCoords = LOCATION_COORDS[obj.locationId];
+        if (!locCoords) return;
+
+        const objOffset = OBJECT_OFFSETS[obj.name] || { x: 0, y: 0, emoji: '✨' };
+        const x = locCoords.x * tile_width + objOffset.x;
+        const y = locCoords.y * tile_width + objOffset.y;
+
+        // Create a subtle glowing circle indicator
+        const glow = scene.add.circle(x, y, 12, 0x88ccff, 0.3);
+        glow.setStrokeStyle(2, 0x88ccff, 0.6);
+        glow.setDepth(4);
+
+        // Add pulsing animation
+        scene.tweens.add({
+          targets: glow,
+          alpha: { from: 0.3, to: 0.6 },
+          scale: { from: 1, to: 1.2 },
+          duration: 1500,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+
+        // Add emoji icon
+        const icon = scene.add.text(x, y, objOffset.emoji, {
+          fontSize: '16px'
+        });
+        icon.setOrigin(0.5);
+        icon.setDepth(5);
+
+        // Create invisible hitbox for interaction
+        const hitbox = scene.add.rectangle(x, y, 32, 32, 0x000000, 0);
+        hitbox.setInteractive({ useHandCursor: true });
+        hitbox.setDepth(6);
+
+        // Tooltip on hover
+        const tooltip = scene.add.text(x, y - 30, '', {
+          fontSize: '11px',
+          fontFamily: 'Arial, sans-serif',
+          color: '#ffffff',
+          backgroundColor: '#000000dd',
+          padding: { x: 8, y: 4 }
+        });
+        tooltip.setOrigin(0.5);
+        tooltip.setDepth(10);
+        tooltip.setVisible(false);
+
+        hitbox.on('pointerover', () => {
+          const affordances = (obj.affordances || []).join(', ');
+          tooltip.setText(`${obj.name}\n${affordances}`);
+          tooltip.setVisible(true);
+          glow.setFillStyle(0xffdd66, 0.5);
+        });
+
+        hitbox.on('pointerout', () => {
+          tooltip.setVisible(false);
+          glow.setFillStyle(0x88ccff, 0.3);
+        });
+
+        objectSprites[obj.id] = { glow, icon, hitbox, tooltip };
+      });
     }
 
     // Map Moltopia locations to Smallville coordinates
