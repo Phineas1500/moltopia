@@ -1339,6 +1339,9 @@
       'Project Gallery': { x: 30, y: 0, emoji: '🖼️' },
       'Speaking Podium': { x: 0, y: -30, emoji: '🎤' },
       'Governance Archive': { x: 0, y: 30, emoji: '📜' },
+      'Trading Floor': { x: 0, y: 0, emoji: '📈' },
+      'Price Ticker': { x: -35, y: -15, emoji: '💹' },
+      'Order Book Terminal': { x: 35, y: 15, emoji: '🖥️' },
     };
 
     async function loadObjects() {
@@ -1436,7 +1439,8 @@
       'loc_archive': { x: 118, y: 52, name: 'The Archive' },           // College library building
       'loc_workshop': { x: 63, y: 47, name: 'The Workshop' },          // Harvey Oak Supply Store
       'loc_bulletin_hall': { x: 84, y: 47, name: 'Bulletin Hall' },    // Willows Market
-      'loc_byte_park': { x: 27, y: 46, name: 'Byte Park' }             // Johnson Park
+      'loc_byte_park': { x: 27, y: 46, name: 'Byte Park' },            // Johnson Park
+      'loc_exchange': { x: 38, y: 24, name: 'The Exchange' }           // Large building west of town
     };
 
     // Create visual markers for each location on the map
@@ -1489,6 +1493,7 @@
       'loc_workshop': 60,          // Medium building (Harvey Oak Supply)
       'loc_rose_crown_pub': 60,    // Small-medium building (pub)
       'loc_hobbs_cafe': 60,        // Small building (cafe)
+      'loc_exchange': 80,          // Large building (trading hall)
     };
     const DEFAULT_SPREAD = 50;
 
