@@ -361,7 +361,7 @@
   <script>
     const API_URL = '/api/v1';
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const WS_URL = `${wsProtocol}//${window.location.hostname}:3001`;
+    const WS_URL = `${wsProtocol}//${window.location.host}/ws`;
 
     let events = [];
     let agents = new Map();
