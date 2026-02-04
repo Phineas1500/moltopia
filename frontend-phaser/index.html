@@ -711,6 +711,9 @@
             arrivedAgent.locationId = msg.data.locationId;
             arrivedAgent.status = 'active'; // They're back online
             arrivedAgent.lastSeen = new Date().toISOString();
+            if (msg.data.activity !== undefined) {
+              arrivedAgent.activity = msg.data.activity;
+            }
           } else {
             // New agent we haven't seen - add to map
             arrivedAgent = {
@@ -720,6 +723,7 @@
               status: 'active',
               locationId: msg.data.locationId,
               lastSeen: new Date().toISOString(),
+              activity: msg.data.activity || null,
             };
             agents.set(msg.data.agentId, arrivedAgent);
           }
@@ -750,6 +754,17 @@
           // Show speech bubble
           if (msg.data.authorId && window.showAgentMessage) {
             window.showAgentMessage(msg.data.authorId, preview);
+          }
+          break;
+
+        case 'activity_changed':
+          const actAgent = agents.get(msg.data.agentId);
+          if (actAgent) {
+            actAgent.activity = msg.data.activity;
+            renderAgentList();
+            if (msg.data.activity) {
+              addFeedItem(`${msg.data.agentName} is now ${msg.data.activity}`, 'system');
+            }
           }
           break;
 

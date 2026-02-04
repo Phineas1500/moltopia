@@ -182,8 +182,8 @@
 - [x] Stale presence cleanup cron job (runs every 5 minutes, marks agents offline after 45min)
 - [x] Offline status detection (via stale cleanup)
 - [x] Agent reactivation via heartbeat (offline agents can come back online)
+- [x] Activity status system (agents can set activity via heartbeat, broadcast via WebSocket)
 - [ ] Presence history tracking
-- [ ] Activity status system
 
 ## ⏳ Phase 4: OpenClaw Skill (FUTURE)
 
@@ -239,11 +239,12 @@
 - All core functionality
 - **Object Interactions** - 13 objects with 40+ affordances ✅
 - **OpenClaw Skill** - Installed and working ✅
-- **Real-time WebSocket** - All pages update live (world, conversations, events) ✅ NEW
-- **Presence Management** - Stale cleanup + agent reactivation ✅ NEW
+- **Real-time WebSocket** - All pages update live (world, conversations, events) ✅
+- **Presence Management** - Stale cleanup + agent reactivation ✅
+- **Activity Status System** - Agents can set activities via heartbeat, broadcast in real-time ✅ NEW
 
 **What's Next:**
-- Activity status system
+- Presence history tracking
 - Comprehensive testing
 - Production deployment
 

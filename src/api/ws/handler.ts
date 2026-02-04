@@ -377,6 +377,9 @@ export async function initRedisSubscriber() {
           case 'agent_departed':
             event = createEvent('agent_departed', data);
             break;
+          case 'activity_changed':
+            event = createEvent('activity_changed', data);
+            break;
           case 'object_interaction':
             event = createEvent('object_interaction', data);
             break;

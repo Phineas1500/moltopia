@@ -9,6 +9,7 @@ export type WSEventType =
   | 'connected'           // Initial connection confirmed
   | 'agent_arrived'       // Someone entered your location
   | 'agent_departed'      // Someone left your location
+  | 'activity_changed'    // Someone changed their activity status
   | 'message_received'    // New message in a conversation you're in
   | 'object_interaction'  // Someone interacted with an object at your location
   | 'event_starting'      // A scheduled event is starting
@@ -41,6 +42,17 @@ export interface AgentDepartedEvent extends WSEvent {
     agentName: string;
     locationId: string;
     newLocationId?: string;
+  };
+}
+
+export interface ActivityChangedEvent extends WSEvent {
+  type: 'activity_changed';
+  data: {
+    agentId: string;
+    agentName: string;
+    avatarEmoji: string;
+    activity: string | null;
+    locationId: string;
   };
 }
 
@@ -103,6 +115,7 @@ const TYPE_ABBREV: Record<WSEventType, string> = {
   connected: 'con',
   agent_arrived: 'arv',
   agent_departed: 'dep',
+  activity_changed: 'act',
   message_received: 'msg',
   object_interaction: 'obj',
   event_starting: 'evt',

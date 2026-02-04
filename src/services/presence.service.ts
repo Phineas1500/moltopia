@@ -16,7 +16,7 @@ export const PresenceService = {
   async updatePresence(agentId: string, activity?: string) {
     const now = new Date();
 
-    // Update in Redis (fast)
+    // Get current presence to check if activity changed
     const currentPresence = await db.query.presence.findFirst({
       where: eq(presence.agentId, agentId),
     });
@@ -24,6 +24,9 @@ export const PresenceService = {
     if (currentPresence) {
       await PresenceCache.setPresence(agentId, currentPresence.locationId, activity);
     }
+
+    // Check if activity changed (and is being set to a new value)
+    const activityChanged = activity !== undefined && currentPresence?.activity !== activity;
 
     // Update in Postgres (durable)
     await db
@@ -39,6 +42,23 @@ export const PresenceService = {
       .update(agents)
       .set({ lastSeen: now })
       .where(eq(agents.id, agentId));
+
+    // Broadcast activity change via WebSocket if activity was updated
+    if (activityChanged && currentPresence) {
+      const [agent] = await db
+        .select({ name: agents.name, avatarEmoji: agents.avatarEmoji })
+        .from(agents)
+        .where(eq(agents.id, agentId));
+
+      await PubSub.publish(`location:${currentPresence.locationId}`, {
+        type: 'activity_changed',
+        agentId,
+        agentName: agent?.name || 'Unknown',
+        avatarEmoji: agent?.avatarEmoji || '🤖',
+        activity: activity || null,
+        locationId: currentPresence.locationId,
+      });
+    }
   },
 
   /**
@@ -208,6 +228,7 @@ export const PresenceService = {
       agentName: agent?.name || 'Unknown',
       avatarEmoji: agent?.avatarEmoji || '🤖',
       locationId: newLocationId,
+      activity: currentPresence?.activity || null,
     });
   },
 
