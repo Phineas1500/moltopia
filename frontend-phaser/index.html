@@ -1473,11 +1473,12 @@
           // Agent moved to a new location - set target so they walk there
           agentTargets[agent.id] = { x: targetX, y: targetY, locationId: agent.locationId };
 
-          // Clear any pending wander timer
+          // Clear wander interval and reset bucket when moving locations
           if (agentWanderTimers[agent.id]) {
-            clearTimeout(agentWanderTimers[agent.id]);
+            clearInterval(agentWanderTimers[agent.id]);
             agentWanderTimers[agent.id] = null;
           }
+          delete agentWanderBuckets[agent.id];
         }
         // If same location, don't change target - let them continue wandering
       }
@@ -1585,18 +1586,12 @@
             agentNameTags[agentId].x = currentPos.x;
             agentNameTags[agentId].y = currentPos.y + 24;
           }
-
-          // Clear wander timer while moving
-          if (agentWanderTimers[agentId]) {
-            clearTimeout(agentWanderTimers[agentId]);
-            agentWanderTimers[agentId] = null;
-          }
         } else {
           // Arrived - stop animation, show idle frame
           sprite.anims.stop();
           sprite.setFrame('down');
 
-          // Schedule a wander if not already scheduled
+          // Start wander interval if not already running
           if (!agentWanderTimers[agentId]) {
             scheduleWander(agentId);
           }
@@ -1639,34 +1634,89 @@
       }, 5000);
     }
 
-    // Schedule an agent to wander to a nearby spot after a delay
-    function scheduleWander(agentId) {
-      const delay = WANDER_INTERVAL_MIN + Math.random() * (WANDER_INTERVAL_MAX - WANDER_INTERVAL_MIN);
+    // Seeded random number generator (deterministic based on seed)
+    function seededRandom(seed) {
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    }
 
-      agentWanderTimers[agentId] = setTimeout(() => {
+    // Get agent ID hash (used for deterministic calculations)
+    function getAgentIdHash(agentId) {
+      let hash = 0;
+      for (let i = 0; i < agentId.length; i++) {
+        hash = ((hash << 5) - hash) + agentId.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return Math.abs(hash);
+    }
+
+    // Wander bucket duration (8-15 seconds per agent, based on their ID)
+    const WANDER_BUCKET_BASE_MS = 8000;
+    const WANDER_BUCKET_VARIANCE_MS = 7000;
+
+    // Get the wander interval for a specific agent (deterministic)
+    function getAgentWanderInterval(agentId) {
+      const hash = getAgentIdHash(agentId);
+      return WANDER_BUCKET_BASE_MS + (hash % WANDER_BUCKET_VARIANCE_MS);
+    }
+
+    // Get the time offset for when an agent starts their wander cycle
+    function getAgentTimeOffset(agentId) {
+      const hash = getAgentIdHash(agentId);
+      // Offset by 0-10 seconds based on agent ID
+      return (hash % 10000);
+    }
+
+    // Calculate deterministic wander position for an agent at a given time bucket
+    function getWanderPosition(agentId, agent, timeBucket) {
+      const coords = LOCATION_COORDS[agent.locationId] || DEFAULT_SPAWN;
+      const baseOffset = getAgentOffset(agentId, agent.locationId);
+      const baseX = coords.x * tile_width + tile_width / 2 + baseOffset.x;
+      const baseY = coords.y * tile_width + tile_width + baseOffset.y;
+
+      const idHash = getAgentIdHash(agentId);
+      const seed = idHash + timeBucket;
+
+      // Use seeded random for angle and distance
+      const wanderAngle = seededRandom(seed) * Math.PI * 2;
+      const wanderDist = seededRandom(seed + 1) * WANDER_RADIUS;
+
+      return {
+        x: baseX + Math.cos(wanderAngle) * wanderDist,
+        y: baseY + Math.sin(wanderAngle) * wanderDist
+      };
+    }
+
+    // Track last wander bucket per agent to detect when to update
+    let agentWanderBuckets = {};
+
+    // Schedule an agent to wander - uses deterministic but staggered timing
+    function scheduleWander(agentId) {
+      // Each agent has their own interval and time offset
+      const wanderInterval = getAgentWanderInterval(agentId);
+      const timeOffset = getAgentTimeOffset(agentId);
+
+      // Check every second if this agent's time bucket changed
+      agentWanderTimers[agentId] = setInterval(() => {
         const target = agentTargets[agentId];
         if (!target) return;
 
-        // Get the base position for this agent at their location
         const agent = agents.get(agentId);
         if (!agent) return;
 
-        const coords = LOCATION_COORDS[agent.locationId] || DEFAULT_SPAWN;
-        const baseOffset = getAgentOffset(agentId, agent.locationId);
-        const baseX = coords.x * tile_width + tile_width / 2 + baseOffset.x;
-        const baseY = coords.y * tile_width + tile_width + baseOffset.y;
+        // Calculate current time bucket for THIS agent (with their offset)
+        const adjustedTime = Date.now() - timeOffset;
+        const currentBucket = Math.floor(adjustedTime / wanderInterval);
+        const lastBucket = agentWanderBuckets[agentId] || 0;
 
-        // Pick a random point within wander radius of base position
-        const wanderAngle = Math.random() * Math.PI * 2;
-        const wanderDist = Math.random() * WANDER_RADIUS;
+        // Only update if bucket changed
+        if (currentBucket !== lastBucket) {
+          agentWanderBuckets[agentId] = currentBucket;
 
-        const newX = baseX + Math.cos(wanderAngle) * wanderDist;
-        const newY = baseY + Math.sin(wanderAngle) * wanderDist;
-
-        // Update target to wander point
-        agentTargets[agentId] = { ...target, x: newX, y: newY };
-        agentWanderTimers[agentId] = null;
-      }, delay);
+          const newPos = getWanderPosition(agentId, agent, currentBucket);
+          agentTargets[agentId] = { ...target, x: newPos.x, y: newPos.y };
+        }
+      }, 1000);
     }
 
     function updateAgentCount() {
