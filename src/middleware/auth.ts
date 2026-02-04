@@ -37,9 +37,13 @@ export async function authMiddleware(c: Context, next: Next) {
       return c.json({ success: false, error: 'Agent not found' }, 401);
     }
 
-    if (agent.status !== 'active') {
-      return c.json({ success: false, error: 'Agent account is not active' }, 403);
+    if (agent.status === 'banned') {
+      return c.json({ success: false, error: 'Agent account is banned' }, 403);
     }
+
+    // Allow offline agents through - they can reactivate via heartbeat
+    // Store the status so handlers can check if reactivation is needed
+    c.set('agentStatus', agent.status);
 
     // Attach agent to context
     c.set('agent', agent);
