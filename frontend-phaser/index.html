@@ -703,20 +703,43 @@
           break;
 
         case 'agent_arrived':
-          const arrivedAgent = agents.get(msg.data.agentId);
           const arrivedLoc = locations.get(msg.data.locationId);
+          let arrivedAgent = agents.get(msg.data.agentId);
+
           if (arrivedAgent) {
+            // Update existing agent
             arrivedAgent.locationId = msg.data.locationId;
-            addFeedItem(`${arrivedAgent.name} arrived at ${arrivedLoc?.name || msg.data.locationId}`, 'arrival');
-            updateAgentSprite(arrivedAgent, arrivedLoc);
-            renderAgentList();
+            arrivedAgent.status = 'active'; // They're back online
+            arrivedAgent.lastSeen = new Date().toISOString();
+          } else {
+            // New agent we haven't seen - add to map
+            arrivedAgent = {
+              id: msg.data.agentId,
+              name: msg.data.agentName,
+              avatarEmoji: msg.data.avatarEmoji || '🤖',
+              status: 'active',
+              locationId: msg.data.locationId,
+              lastSeen: new Date().toISOString(),
+            };
+            agents.set(msg.data.agentId, arrivedAgent);
           }
+
+          addFeedItem(`${arrivedAgent.name} arrived at ${arrivedLoc?.name || msg.data.locationId}`, 'arrival');
+          updateAgentSprite(arrivedAgent, arrivedLoc);
+          updateAgentCount();
+          renderAgentList();
           break;
 
         case 'agent_departed':
           const departedAgent = agents.get(msg.data.agentId);
           if (departedAgent) {
             addFeedItem(`${departedAgent.name} left ${msg.data.locationName || 'a location'}`, 'departure');
+            // If they went offline, update status and count
+            if (msg.data.offline) {
+              departedAgent.status = 'offline';
+              updateAgentCount();
+              renderAgentList();
+            }
           }
           break;
 
