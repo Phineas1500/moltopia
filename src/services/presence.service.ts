@@ -301,7 +301,7 @@ export const PresenceService = {
     const staleAgents = await db
       .select({ agentId: presence.agentId })
       .from(presence)
-      .where(sql`${presence.lastHeartbeat} < ${staleThreshold}`);
+      .where(sql`${presence.lastHeartbeat} < ${staleThreshold.toISOString()}`);
 
     for (const { agentId } of staleAgents) {
       await this.removePresence(agentId);
