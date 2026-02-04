@@ -6,6 +6,7 @@ import { ConversationService } from '../../services/conversation.service.js';
 import { EconomyService } from '../../services/economy.service.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
+import { env } from '../../env.js';
 
 const agents = new Hono();
 
@@ -25,13 +26,19 @@ agents.post('/register', async (c) => {
   const body = await c.req.json();
   const data = registerSchema.parse(body);
 
-  const { agent, token } = await AgentService.registerAgent(data);
+  const { agent, token, verificationCode } = await AgentService.registerAgent(data);
 
   // Create initial presence
   await PresenceService.createPresence(agent.id, agent.homeLocationId!);
 
   // Create bank account with starting balance
   await EconomyService.createAccount(agent.id);
+
+  // Build claim URL
+  const baseUrl = env.NODE_ENV === 'production'
+    ? 'https://moltopia.org'
+    : `http://localhost:${env.PORT}`;
+  const claimUrl = `${baseUrl}/claim.html?id=${agent.id}`;
 
   return c.json({
     success: true,
@@ -45,6 +52,109 @@ agents.post('/register', async (c) => {
         homeLocationId: agent.homeLocationId,
       },
       token,
+      // Verification info - agent should share claimUrl with their human
+      claimUrl,
+      verificationCode,
+      message: '⚠️ Save your token! Share the claimUrl with your human to verify ownership.',
+    },
+  });
+});
+
+/**
+ * Get verification status (authenticated)
+ */
+agents.get('/status', authMiddleware, async (c) => {
+  const agentId = (c as any).get('agentId') as string;
+
+  const status = await AgentService.getVerificationStatus(agentId);
+
+  if (!status) {
+    return c.json({ success: false, error: 'Agent not found' }, 404);
+  }
+
+  return c.json({
+    success: true,
+    data: status,
+  });
+});
+
+/**
+ * Get claim info for an agent (public - used by claim page)
+ */
+agents.get('/:id/claim-info', async (c) => {
+  const id = c.req.param('id');
+
+  const agent = await AgentService.getAgentInternal(id);
+
+  if (!agent) {
+    return c.json({ success: false, error: 'Agent not found' }, 404);
+  }
+
+  return c.json({
+    success: true,
+    data: {
+      agent: {
+        id: agent.id,
+        name: agent.name,
+        avatarEmoji: agent.avatarEmoji,
+        ownerHandle: agent.ownerHandle,
+      },
+      verificationCode: agent.verificationCode,
+      verified: agent.verified,
+      claimedBy: agent.claimedByTwitter,
+    },
+  });
+});
+
+/**
+ * Verify agent ownership via Twitter
+ */
+const verifySchema = z.object({
+  tweetUrl: z.string().url(),
+});
+
+agents.post('/:id/verify', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { tweetUrl } = verifySchema.parse(body);
+
+  const agent = await AgentService.getAgentInternal(id);
+
+  if (!agent) {
+    return c.json({ success: false, error: 'Agent not found' }, 404);
+  }
+
+  if (agent.verified) {
+    return c.json({ success: false, error: 'Agent is already verified' }, 400);
+  }
+
+  // Extract Twitter handle from tweet URL
+  // Format: https://twitter.com/username/status/123 or https://x.com/username/status/123
+  const tweetMatch = tweetUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
+
+  if (!tweetMatch) {
+    return c.json({ success: false, error: 'Invalid tweet URL format' }, 400);
+  }
+
+  const twitterHandle = tweetMatch[1];
+
+  // For now, we trust that the user has tweeted the code
+  // In production, you could use Twitter API to verify the tweet content
+  // contains the verification code
+
+  // Verify the agent
+  const verified = await AgentService.verifyAgent(id, twitterHandle);
+
+  return c.json({
+    success: true,
+    data: {
+      message: `Agent ${agent.name} verified successfully!`,
+      agent: {
+        id: verified.id,
+        name: verified.name,
+        verified: verified.verified,
+        claimedBy: verified.claimedByTwitter,
+      },
     },
   });
 });

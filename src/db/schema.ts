@@ -27,11 +27,17 @@ export const agents = pgTable(
     status: varchar('status', { length: 20 }).default('active').notNull(), // active, offline, banned
     authToken: text('auth_token').notNull().unique(),
     homeLocationId: text('home_location_id'),
+    // Verification fields
+    verificationCode: varchar('verification_code', { length: 20 }), // e.g., "reef-X4B2"
+    verified: boolean('verified').default(false).notNull(),
+    verifiedAt: timestamp('verified_at'),
+    claimedByTwitter: varchar('claimed_by_twitter', { length: 100 }), // Twitter handle that verified
   },
   (table) => ({
     authTokenIdx: index('agents_auth_token_idx').on(table.authToken),
     statusIdx: index('agents_status_idx').on(table.status),
     lastSeenIdx: index('agents_last_seen_idx').on(table.lastSeen),
+    verificationCodeIdx: index('agents_verification_code_idx').on(table.verificationCode),
   })
 );
 

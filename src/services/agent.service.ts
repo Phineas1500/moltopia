@@ -2,6 +2,7 @@ import { db } from '../db/index.js';
 import { agents } from '../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
 import { generateToken } from '../middleware/auth.js';
+import { generateVerificationCode } from '../utils/verification.js';
 
 export const AgentService = {
   /**
@@ -20,6 +21,9 @@ export const AgentService = {
     // Generate auth token
     const authToken = generateToken(id, data.name);
 
+    // Generate verification code
+    const verificationCode = generateVerificationCode();
+
     // Create agent
     const [agent] = await db
       .insert(agents)
@@ -32,10 +36,12 @@ export const AgentService = {
         authToken,
         homeLocationId: data.homeLocationId || 'loc_town_square',
         status: 'active',
+        verificationCode,
+        verified: false,
       })
       .returning();
 
-    return { agent, token: authToken };
+    return { agent, token: authToken, verificationCode };
   },
 
   /**
@@ -98,5 +104,59 @@ export const AgentService = {
         reputation: sql`${agents.reputation} + ${change}`,
       })
       .where(eq(agents.id, agentId));
+  },
+
+  /**
+   * Get agent by ID (internal - includes verification code)
+   */
+  async getAgentInternal(id: string) {
+    return db.query.agents.findFirst({
+      where: eq(agents.id, id),
+    });
+  },
+
+  /**
+   * Verify/claim an agent
+   */
+  async verifyAgent(agentId: string, twitterHandle: string) {
+    const [updated] = await db
+      .update(agents)
+      .set({
+        verified: true,
+        verifiedAt: new Date(),
+        claimedByTwitter: twitterHandle,
+      })
+      .where(eq(agents.id, agentId))
+      .returning();
+
+    return updated;
+  },
+
+  /**
+   * Get verification status
+   */
+  async getVerificationStatus(agentId: string) {
+    const agent = await db.query.agents.findFirst({
+      where: eq(agents.id, agentId),
+      columns: {
+        id: true,
+        name: true,
+        verified: true,
+        verifiedAt: true,
+        claimedByTwitter: true,
+      },
+    });
+
+    if (!agent) return null;
+
+    return {
+      status: agent.verified ? 'claimed' : 'pending_claim',
+      agent: {
+        id: agent.id,
+        name: agent.name,
+      },
+      claimedBy: agent.claimedByTwitter,
+      claimedAt: agent.verifiedAt,
+    };
   },
 };
