@@ -699,6 +699,7 @@
     </nav>
     <div class="status">
       <span id="connection-status" class="disconnected">Loading...</span>
+      <span id="agent-count">0 agents online</span>
     </div>
   </header>
 
@@ -959,6 +960,10 @@
         const agentsData = await agentsRes.json();
 
         if (!agentsData.success) return;
+
+        // Update agent count
+        const onlineAgents = agentsData.data.agents.filter(a => a.status === 'active').length;
+        document.getElementById('agent-count').textContent = `${onlineAgents} agents online`;
 
         const portfoliosDiv = document.getElementById('portfolios-list');
         let html = '';
