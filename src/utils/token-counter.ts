@@ -28,10 +28,8 @@ export function countJSONTokens(obj: any): number {
 
 /**
  * Free the encoder (call on shutdown)
+ * Note: js-tiktoken doesn't require manual cleanup, but we keep this for API compatibility
  */
 export function freeEncoder(): void {
-  if (encoder) {
-    encoder.free();
-    encoder = null;
-  }
+  encoder = null;
 }

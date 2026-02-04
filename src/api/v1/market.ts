@@ -82,7 +82,7 @@ const placeOrderSchema = z.object({
 });
 
 market.post('/orders', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = placeOrderSchema.parse(body);
 
@@ -109,7 +109,7 @@ market.post('/orders', authMiddleware, async (c) => {
  * Get my open orders
  */
 market.get('/orders', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const orders = await MarketService.getMyOrders(agentId);
 
   return c.json({
@@ -128,7 +128,7 @@ market.get('/orders', authMiddleware, async (c) => {
  * Cancel an order
  */
 market.delete('/orders/:orderId', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const orderId = c.req.param('orderId');
 
   try {

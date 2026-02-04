@@ -121,7 +121,7 @@ export async function compactMiddleware(c: Context, next: Next) {
   // Intercept the json() method on Context
   const originalJson = c.json.bind(c);
 
-  c.json = function (object: any, status?: number) {
+  (c as any).json = function (object: any, status?: number) {
     // Transform to compact format
     const compactBody = compactObject(object);
 
@@ -132,7 +132,7 @@ export async function compactMiddleware(c: Context, next: Next) {
     }
 
     // Call original json method with compact body
-    const response = originalJson(compactBody, status);
+    const response = (originalJson as any)(compactBody, status);
 
     // Add token count header if enabled
     if (env.ENABLE_TOKEN_METRICS) {

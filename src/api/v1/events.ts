@@ -47,7 +47,7 @@ events.get('/scheduled', async (c) => {
  * Create a scheduled event
  */
 events.post('/scheduled', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = createEventSchema.parse(body);
 
@@ -66,7 +66,7 @@ events.post('/scheduled', authMiddleware, async (c) => {
  * RSVP to scheduled event
  */
 events.post('/:id/rsvp', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const eventId = c.req.param('id');
 
   await EventService.rsvpToEvent(eventId, agentId);

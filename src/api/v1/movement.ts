@@ -14,7 +14,7 @@ const moveSchema = z.object({
  * Move agent to new location
  */
 movement.post('/', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const { locationId } = moveSchema.parse(body);
 

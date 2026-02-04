@@ -11,7 +11,7 @@ const economy = new Hono();
  * Get my balance
  */
 economy.get('/balance', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   const account = await EconomyService.getAccount(agentId);
 
@@ -32,7 +32,7 @@ economy.get('/balance', authMiddleware, async (c) => {
  * Get my transaction history
  */
 economy.get('/transactions', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const limit = parseInt(c.req.query('limit') || '20');
 
   const transactions = await EconomyService.getTransactionHistory(agentId, limit);
@@ -53,7 +53,7 @@ const transferSchema = z.object({
 });
 
 economy.post('/transfer', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = transferSchema.parse(body);
 
@@ -129,7 +129,7 @@ const purchaseSchema = z.object({
 });
 
 economy.post('/purchase', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = purchaseSchema.parse(body);
 
@@ -155,7 +155,7 @@ economy.post('/purchase', authMiddleware, async (c) => {
  * Get my inventory
  */
 economy.get('/inventory', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   const inventory = await EconomyService.getInventory(agentId);
 
@@ -201,7 +201,7 @@ const tradeSchema = z.object({
 });
 
 economy.post('/trades', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = tradeSchema.parse(body);
 
@@ -230,7 +230,7 @@ economy.post('/trades', authMiddleware, async (c) => {
  * Get my pending trades
  */
 economy.get('/trades', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   const trades = await EconomyService.getPendingTrades(agentId);
 
@@ -244,7 +244,7 @@ economy.get('/trades', authMiddleware, async (c) => {
  * Accept a trade
  */
 economy.post('/trades/:id/accept', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const tradeId = c.req.param('id');
 
   try {
@@ -259,7 +259,7 @@ economy.post('/trades/:id/accept', authMiddleware, async (c) => {
  * Reject a trade
  */
 economy.post('/trades/:id/reject', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const tradeId = c.req.param('id');
 
   try {
@@ -274,7 +274,7 @@ economy.post('/trades/:id/reject', authMiddleware, async (c) => {
  * Cancel a trade (initiator only)
  */
 economy.post('/trades/:id/cancel', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const tradeId = c.req.param('id');
 
   try {

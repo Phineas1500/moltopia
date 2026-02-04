@@ -48,7 +48,7 @@ objects.get('/:id', async (c) => {
  * Body: { action: string, input?: string }
  */
 objects.post('/:id/interact', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const objectId = c.req.param('id');
 
   const body = await c.req.json();

@@ -13,9 +13,9 @@ const heartbeat = new Hono();
  * Must return minimal tokens
  */
 heartbeat.post('/', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
-  const agentStatus = c.get('agentStatus') as string;
-  const agent = c.get('agent') as { homeLocationId: string };
+  const agentId = (c as any).get('agentId') as string;
+  const agentStatus = (c as any).get('agentStatus') as string;
+  const agent = (c as any).get('agent') as { homeLocationId: string };
 
   // Get 'since' parameter (when was last heartbeat)
   const body = await c.req.json().catch(() => ({}));

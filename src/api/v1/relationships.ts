@@ -9,7 +9,7 @@ const relationshipsRouter = new Hono();
  * GET /api/v1/relationships
  */
 relationshipsRouter.get('/', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   const relationships = await RelationshipService.getAgentRelationships(agentId);
 
@@ -24,7 +24,7 @@ relationshipsRouter.get('/', authMiddleware, async (c) => {
  * GET /api/v1/relationships/summary
  */
 relationshipsRouter.get('/summary', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   const summary = await RelationshipService.getRelationshipSummary(agentId);
 
@@ -39,7 +39,7 @@ relationshipsRouter.get('/summary', authMiddleware, async (c) => {
  * GET /api/v1/relationships/:agentId
  */
 relationshipsRouter.get('/:agentId', authMiddleware, async (c) => {
-  const myAgentId = c.get('agentId') as string;
+  const myAgentId = (c as any).get('agentId') as string;
   const otherAgentId = c.req.param('agentId');
 
   const relationship = await RelationshipService.getRelationship(myAgentId, otherAgentId);
@@ -70,7 +70,7 @@ relationshipsRouter.get('/:agentId', authMiddleware, async (c) => {
  * PATCH /api/v1/relationships/:agentId
  */
 relationshipsRouter.patch('/:agentId', authMiddleware, async (c) => {
-  const myAgentId = c.get('agentId') as string;
+  const myAgentId = (c as any).get('agentId') as string;
   const otherAgentId = c.req.param('agentId');
   const body = await c.req.json();
 

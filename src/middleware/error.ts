@@ -23,7 +23,7 @@ export async function errorHandler(c: Context, next: Next) {
         success: false,
         error: 'Validation error',
         details: error.errors,
-      }, status);
+      }, status as any);
     }
 
     if (error instanceof Error) {
@@ -51,6 +51,6 @@ export async function errorHandler(c: Context, next: Next) {
       response.stack = error.stack;
     }
 
-    return c.json(response, status);
+    return c.json(response, status as any);
   }
 }

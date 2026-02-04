@@ -85,7 +85,7 @@ agents.get('/:id', async (c) => {
  * Update current agent's profile
  */
 agents.patch('/me', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
 
   const updateSchema = z.object({

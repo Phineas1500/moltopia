@@ -31,7 +31,7 @@ const purchaseElementSchema = z.object({
 });
 
 crafting.post('/elements/purchase', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = purchaseElementSchema.parse(body);
 
@@ -65,7 +65,7 @@ const craftSchema = z.object({
 });
 
 crafting.post('/craft', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = craftSchema.parse(body);
 
@@ -106,7 +106,7 @@ crafting.get('/discoveries', async (c) => {
  * Get my discovery badges
  */
 crafting.get('/badges', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const badges = await CraftingService.getAgentBadges(agentId);
 
   return c.json({

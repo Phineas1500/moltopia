@@ -20,7 +20,7 @@ const sendMessageSchema = z.object({
  * Create a new conversation
  */
 conversations.post('/', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   let body;
   try {
@@ -60,7 +60,7 @@ conversations.post('/', authMiddleware, async (c) => {
  * Get agent's conversations (authenticated)
  */
 conversations.get('/', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   const conversationList = await ConversationService.getAgentConversations(agentId);
 
@@ -89,7 +89,7 @@ conversations.get('/all', async (c) => {
  * Get conversation by ID (authenticated - for participants)
  */
 conversations.get('/:id', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const id = c.req.param('id');
 
   const conversation = await ConversationService.getConversation(id);
@@ -150,7 +150,7 @@ conversations.get('/view/:id', async (c) => {
  * Send message to conversation
  */
 conversations.post('/:id/messages', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
   const id = c.req.param('id');
   const body = await c.req.json();
   const { content } = sendMessageSchema.parse(body);

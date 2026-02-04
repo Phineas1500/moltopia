@@ -11,7 +11,7 @@ const perception = new Hono();
  * WARNING: This is token-expensive. Use heartbeat for updates instead.
  */
 perception.get('/', authMiddleware, async (c) => {
-  const agentId = c.get('agentId') as string;
+  const agentId = (c as any).get('agentId') as string;
 
   // Get agent's current presence
   const agentPresence = await db.query.presence.findFirst({

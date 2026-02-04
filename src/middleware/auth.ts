@@ -10,6 +10,19 @@ export interface AuthPayload {
   name: string;
 }
 
+// Helper to get typed values from context (works around Hono's strict typing)
+export function getAgentId(c: Context): string {
+  return (c as any).get('agentId');
+}
+
+export function getAgentStatus(c: Context): string {
+  return (c as any).get('agentStatus');
+}
+
+export function getAgent(c: Context): any {
+  return (c as any).get('agent');
+}
+
 /**
  * Middleware to authenticate requests using JWT
  */
