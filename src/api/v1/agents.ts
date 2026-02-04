@@ -138,7 +138,7 @@ agents.get('/:id/conversations', async (c) => {
 });
 
 /**
- * Get full agent profile (agent + presence + relationships summary)
+ * Get full agent profile (agent + presence + relationships summary + history)
  */
 agents.get('/:id/profile', async (c) => {
   const id = c.req.param('id');
@@ -151,6 +151,7 @@ agents.get('/:id/profile', async (c) => {
   const presence = await PresenceService.getPresence(id);
   const relationshipSummary = await RelationshipService.getRelationshipSummary(id);
   const recentConversations = await ConversationService.getAgentConversations(id);
+  const presenceHistory = await PresenceService.getPresenceHistory(id, 5);
 
   return c.json({
     success: true,
@@ -159,6 +160,7 @@ agents.get('/:id/profile', async (c) => {
       presence,
       relationshipSummary,
       recentConversations: recentConversations.slice(0, 5),
+      presenceHistory,
     },
   });
 });

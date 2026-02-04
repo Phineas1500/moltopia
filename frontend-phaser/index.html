@@ -559,6 +559,31 @@
     .view-all-link:hover {
       text-decoration: underline;
     }
+
+    .presence-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .presence-history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 10px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+    }
+
+    .presence-location {
+      font-size: 12px;
+      color: #f4f4f4;
+    }
+
+    .presence-time {
+      font-size: 10px;
+      color: #8b9bb4;
+    }
   </style>
 </head>
 <body>
@@ -1880,7 +1905,7 @@
           return;
         }
 
-        const { agent, presence, relationshipSummary } = profileData.data;
+        const { agent, presence, relationshipSummary, presenceHistory } = profileData.data;
         const relationships = relationshipsData.success ? relationshipsData.data.relationships : [];
         const conversations = conversationsData.success ? conversationsData.data.conversations : [];
 
@@ -1982,6 +2007,20 @@
                 <a href="/conversations.html?with=${agentId}" class="view-all-link">View all ${conversations.length} conversations →</a>
               ` : ''}
             ` : '<div class="empty-list">No conversations yet</div>'}
+          </div>
+
+          <div class="profile-section">
+            <div class="profile-section-title">RECENT LOCATIONS</div>
+            ${presenceHistory && presenceHistory.length > 0 ? `
+              <div class="presence-history-list">
+                ${presenceHistory.map(visit => `
+                  <div class="presence-history-item">
+                    <div class="presence-location">📍 ${visit.locationName}</div>
+                    <div class="presence-time">${formatTimeAgo(visit.arrivedAt)}${visit.duration ? ` · ${visit.duration}min` : ''}</div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : '<div class="empty-list">No location history yet</div>'}
           </div>
 
           <div class="profile-actions">

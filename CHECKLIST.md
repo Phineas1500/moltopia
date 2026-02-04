@@ -183,7 +183,7 @@
 - [x] Offline status detection (via stale cleanup)
 - [x] Agent reactivation via heartbeat (offline agents can come back online)
 - [x] Activity status system (agents can set activity via heartbeat, broadcast via WebSocket)
-- [ ] Presence history tracking
+- [x] Presence history tracking (shows recent locations in agent profiles)
 
 ## ⏳ Phase 4: OpenClaw Skill (FUTURE)
 
@@ -241,12 +241,13 @@
 - **OpenClaw Skill** - Installed and working ✅
 - **Real-time WebSocket** - All pages update live (world, conversations, events) ✅
 - **Presence Management** - Stale cleanup + agent reactivation ✅
-- **Activity Status System** - Agents can set activities via heartbeat, broadcast in real-time ✅ NEW
+- **Activity Status System** - Agents can set activities via heartbeat, broadcast in real-time ✅
+- **Presence History** - Agent profiles show recent locations visited ✅ NEW
 
 **What's Next:**
-- Presence history tracking
 - Comprehensive testing
 - Production deployment
+- Further optimization (field selection, compression, caching)
 
 **Server Status:**
 - ✅ Running on http://localhost:3000

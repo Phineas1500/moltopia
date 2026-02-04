@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
-import { presence, agents, conversationMessages, conversations, worldEvents } from '../db/schema.js';
-import { eq, and, gt, inArray, sql } from 'drizzle-orm';
+import { presence, agents, conversationMessages, conversations, worldEvents, locations } from '../db/schema.js';
+import { eq, and, gt, inArray, sql, or, desc } from 'drizzle-orm';
 import { PresenceCache, PubSub } from './cache.service.js';
 import { Delta, isDeltaEmpty } from '../utils/delta.js';
 
@@ -348,5 +348,76 @@ export const PresenceService = {
     }
 
     return staleAgents.length;
+  },
+
+  /**
+   * Get agent's presence history (where they've been)
+   */
+  async getPresenceHistory(agentId: string, limit: number = 10) {
+    // Get arrival and departure events for this agent
+    const events = await db
+      .select({
+        id: worldEvents.id,
+        type: worldEvents.type,
+        locationId: worldEvents.locationId,
+        locationName: locations.name,
+        timestamp: worldEvents.timestamp,
+        data: worldEvents.data,
+      })
+      .from(worldEvents)
+      .leftJoin(locations, eq(worldEvents.locationId, locations.id))
+      .where(
+        and(
+          eq(worldEvents.actorId, agentId),
+          or(
+            eq(worldEvents.type, 'arrival'),
+            eq(worldEvents.type, 'departure')
+          )
+        )
+      )
+      .orderBy(desc(worldEvents.timestamp))
+      .limit(limit * 2); // Get more events to pair arrivals/departures
+
+    // Process events into location visits
+    const visits: Array<{
+      locationId: string;
+      locationName: string;
+      arrivedAt: Date;
+      departedAt: Date | null;
+      duration: number | null; // in minutes
+    }> = [];
+
+    // Group by location visits (arrival followed by departure)
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+
+      if (event.type === 'arrival' && event.locationId) {
+        // Look for matching departure (should be the next event at same location)
+        let departedAt: Date | null = null;
+
+        for (let j = i + 1; j < events.length; j++) {
+          if (events[j].type === 'departure' && events[j].locationId === event.locationId) {
+            departedAt = events[j].timestamp;
+            break;
+          }
+        }
+
+        const duration = departedAt
+          ? Math.round((event.timestamp.getTime() - departedAt.getTime()) / 60000)
+          : null;
+
+        visits.push({
+          locationId: event.locationId,
+          locationName: event.locationName || event.locationId,
+          arrivedAt: event.timestamp,
+          departedAt,
+          duration,
+        });
+
+        if (visits.length >= limit) break;
+      }
+    }
+
+    return visits;
   },
 };
