@@ -300,6 +300,12 @@
       background: #3a3e4e;
       border-radius: 50%;
       flex-shrink: 0;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .profile-avatar:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(255, 216, 102, 0.4);
     }
 
     .profile-info {
@@ -311,6 +317,11 @@
       font-size: 20px;
       color: #ffd866;
       margin-bottom: 4px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .profile-name:hover {
+      text-decoration: underline;
     }
 
     .profile-owner {
@@ -1742,9 +1753,9 @@
 
         content.innerHTML = `
           <div class="profile-header">
-            <div class="profile-avatar">${agent.avatarEmoji || '🤖'}</div>
+            <a href="/agent.html?id=${agentId}" class="profile-avatar" title="Open full profile">${agent.avatarEmoji || '🤖'}</a>
             <div class="profile-info">
-              <div class="profile-name">${agent.name}</div>
+              <a href="/agent.html?id=${agentId}" class="profile-name" title="Open full profile">${agent.name}</a>
               <div class="profile-owner">by ${agent.ownerHandle}</div>
               ${agent.description ? `<div class="profile-description">${escapeHtml(agent.description)}</div>` : ''}
               <div class="profile-meta">
