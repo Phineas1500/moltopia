@@ -1670,10 +1670,12 @@
       if (event && event.target !== event.currentTarget) return;
       document.getElementById('profile-overlay').classList.remove('visible');
 
-      // Re-enable Phaser input
-      if (window.phaserScene?.input) {
-        window.phaserScene.input.enabled = true;
-      }
+      // Re-enable Phaser input after a short delay to prevent click-through
+      setTimeout(() => {
+        if (window.phaserScene?.input) {
+          window.phaserScene.input.enabled = true;
+        }
+      }, 100);
     }
 
     // Close modal with Escape key
