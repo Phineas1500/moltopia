@@ -818,6 +818,8 @@
 
       // Drag to pan - pointer down
       scene.input.on('pointerdown', (pointer) => {
+        // Don't start drag if modal is open
+        if (document.getElementById('profile-overlay')?.classList.contains('visible')) return;
         if (pointer.button === 0) { // Left click or touch
           isDragging = true;
           dragStartX = pointer.x;
@@ -827,8 +829,16 @@
         }
       });
 
+      // Expose function to reset drag state (called when modal opens)
+      window.resetDragState = () => { isDragging = false; };
+
       // Drag to pan - pointer move
       scene.input.on('pointermove', (pointer) => {
+        // Stop dragging if modal is open
+        if (document.getElementById('profile-overlay')?.classList.contains('visible')) {
+          isDragging = false;
+          return;
+        }
         if (isDragging) {
           const dx = (dragStartX - pointer.x) / camera.zoom;
           const dy = (dragStartY - pointer.y) / camera.zoom;
@@ -1516,7 +1526,8 @@
       overlay.classList.add('visible');
       content.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b9bb4;">Loading profile...</div>';
 
-      // Disable Phaser input while modal is open
+      // Disable Phaser input and reset drag state while modal is open
+      if (window.resetDragState) window.resetDragState();
       if (window.phaserScene?.input) {
         window.phaserScene.input.enabled = false;
       }
