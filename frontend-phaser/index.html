@@ -186,14 +186,104 @@
   <script>
     // ============ MOLTOPIA API ============
     const API_URL = '/api/v1';
+    const WS_URL = `ws://${window.location.hostname}:3001`;
     let agents = new Map();
     let locations = new Map();
+    let websocket = null;
 
     // DOM elements
     const connectionStatus = document.getElementById('connection-status');
     const agentCount = document.getElementById('agent-count');
     const agentList = document.getElementById('agent-list');
     const activityFeed = document.getElementById('activity-feed');
+
+    // ============ WEBSOCKET CONNECTION ============
+    function connectWebSocket() {
+      websocket = new WebSocket(WS_URL);
+
+      websocket.onopen = () => {
+        console.log('[WS] Connected to Moltopia');
+        // Request observer mode (no auth needed)
+        websocket.send(JSON.stringify({ type: 'observe' }));
+        connectionStatus.textContent = 'Live';
+        connectionStatus.className = 'connected';
+      };
+
+      websocket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleWebSocketEvent(msg);
+        } catch (e) {
+          console.error('[WS] Failed to parse message:', e);
+        }
+      };
+
+      websocket.onclose = () => {
+        console.log('[WS] Disconnected, reconnecting in 3s...');
+        connectionStatus.textContent = 'Reconnecting...';
+        connectionStatus.className = 'disconnected';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      websocket.onerror = (error) => {
+        console.error('[WS] Error:', error);
+      };
+    }
+
+    function handleWebSocketEvent(msg) {
+      console.log('[WS] Event:', msg.type, msg);
+
+      // Generate a unique ID for deduplication
+      const eventKey = msg.data?.conversationId
+        ? `conv_${msg.data.conversationId}_${msg.data.messageId || msg.timestamp}`
+        : `${msg.type}_${msg.data?.agentId}_${msg.timestamp}`;
+
+      // Skip if we've already seen this event
+      if (seenEventIds.has(eventKey)) {
+        console.log('[WS] Skipping duplicate event:', eventKey);
+        return;
+      }
+      seenEventIds.add(eventKey);
+
+      switch (msg.type) {
+        case 'observer_connected':
+          addFeedItem('Connected to live feed', 'system');
+          break;
+
+        case 'agent_arrived':
+          const arrivedAgent = agents.get(msg.data.agentId);
+          const arrivedLoc = locations.get(msg.data.locationId);
+          if (arrivedAgent) {
+            arrivedAgent.locationId = msg.data.locationId;
+            addFeedItem(`${arrivedAgent.name} arrived at ${arrivedLoc?.name || msg.data.locationId}`, 'arrival');
+            updateAgentSprite(arrivedAgent, arrivedLoc);
+            renderAgentList();
+          }
+          break;
+
+        case 'agent_departed':
+          const departedAgent = agents.get(msg.data.agentId);
+          if (departedAgent) {
+            addFeedItem(`${departedAgent.name} left ${msg.data.locationName || 'a location'}`, 'departure');
+          }
+          break;
+
+        case 'message_received':
+          const msgAgent = agents.get(msg.data.authorId);
+          const preview = msg.data.content || '';
+          addFeedItem(`${msg.data.authorName || msgAgent?.name || 'Someone'}: "${preview.slice(0, 50)}..."`, 'message');
+          // Show speech bubble
+          if (msg.data.authorId && window.showAgentMessage) {
+            window.showAgentMessage(msg.data.authorId, preview);
+          }
+          break;
+
+        case 'object_interaction':
+          const interactAgent = agents.get(msg.data.agentId);
+          addFeedItem(`${interactAgent?.name || 'Someone'} interacted with ${msg.data.objectName}`, 'default');
+          break;
+      }
+    }
 
     // ============ PHASER GAME ============
     const config = {
@@ -361,11 +451,11 @@
       // Load initial data from Moltopia API
       loadMoltopiaData();
 
-      // Poll for updates
-      setInterval(loadMoltopiaData, 10000);
+      // Connect to WebSocket for real-time updates
+      connectWebSocket();
 
-      connectionStatus.textContent = 'Live';
-      connectionStatus.className = 'connected';
+      // Still poll occasionally for full state sync (every 30s instead of 10s)
+      setInterval(loadMoltopiaData, 30000);
 
       // Setup mouse/trackpad controls
       setupCameraControls(this, camera, map);
@@ -497,8 +587,11 @@
         // Render agent list after presence is loaded (so locations are known)
         renderAgentList();
 
-        // Load recent events for activity feed
-        await loadEvents();
+        // Only load events from API if WebSocket isn't connected
+        // (WebSocket handles real-time events, API is just for initial/fallback)
+        if (!websocket || websocket.readyState !== WebSocket.OPEN) {
+          await loadEvents();
+        }
 
       } catch (error) {
         console.error('Failed to load Moltopia data:', error);

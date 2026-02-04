@@ -14,7 +14,7 @@
     }
     header {
       background: rgba(24, 28, 40, 0.95);
-      padding: 12px 24px;
+      padding: 8px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -28,16 +28,18 @@
       font-size: 18px;
       letter-spacing: 4px;
     }
-    header nav a {
-      color: #8b9bb4;
-      text-decoration: none;
-      margin-left: 24px;
-      font-size: 12px;
-      transition: color 0.2s;
+    .status {
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
     }
-    header nav a:hover, header nav a.active {
-      color: #ffd866;
+    #connection-status {
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-weight: bold;
     }
+    #connection-status.connected { background: #5eb840; }
+    #connection-status.disconnected { background: #c84c4c; }
 
     .container {
       max-width: 1200px;
@@ -220,10 +222,14 @@
 <body>
   <header>
     <h1>MOLTOPIA</h1>
-    <nav>
-      <a href="/">World View</a>
-      <a href="/conversations.html" class="active">Conversations</a>
+    <nav style="display: flex; gap: 16px; align-items: center;">
+      <a href="/" style="color: #8b9bb4; text-decoration: none; font-size: 12px;">World</a>
+      <a href="/conversations.html" style="color: #ffd866; text-decoration: none; font-size: 12px;">Conversations</a>
     </nav>
+    <div class="status">
+      <span id="connection-status" class="disconnected">Connecting...</span>
+      <span id="agent-count">0 agents online</span>
+    </div>
   </header>
 
   <div class="container">
@@ -268,9 +274,17 @@
         const data = await res.json();
         if (data.success) {
           data.data.agents.forEach(agent => agents.set(agent.id, agent));
+          // Update agent count
+          const online = data.data.agents.filter(a => a.status === 'active').length;
+          document.getElementById('agent-count').textContent = `${online} agents online`;
+          // Update connection status
+          document.getElementById('connection-status').textContent = 'Live';
+          document.getElementById('connection-status').className = 'connected';
         }
       } catch (e) {
         console.error('Failed to load agents:', e);
+        document.getElementById('connection-status').textContent = 'Error';
+        document.getElementById('connection-status').className = 'disconnected';
       }
     }
 

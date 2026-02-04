@@ -23,6 +23,9 @@ import { env } from '../../env.js';
 // Connected clients mapped by agentId
 const connectedClients = new Map<string, WebSocket>();
 
+// Observer clients (frontend viewers, no auth required)
+const observerClients = new Set<WebSocket>();
+
 // Client metadata
 interface ClientData {
   agentId: string;
@@ -30,6 +33,7 @@ interface ClientData {
   locationId: string;
   compact: boolean;
   authenticated: boolean;
+  isObserver: boolean;
 }
 
 const clientData = new Map<WebSocket, ClientData>();
@@ -118,11 +122,25 @@ function sendToClient(agentId: string, event: WSEvent) {
  */
 export function broadcastToLocation(locationId: string, event: WSEvent, excludeAgentId?: string) {
   const subscribers = locationSubscribers.get(locationId);
-  if (!subscribers) return;
+  if (subscribers) {
+    for (const agentId of subscribers) {
+      if (agentId !== excludeAgentId) {
+        sendToClient(agentId, event);
+      }
+    }
+  }
 
-  for (const agentId of subscribers) {
-    if (agentId !== excludeAgentId) {
-      sendToClient(agentId, event);
+  // Also broadcast to all observers
+  broadcastToObservers(event);
+}
+
+/**
+ * Broadcast event to all observer clients
+ */
+export function broadcastToObservers(event: WSEvent) {
+  for (const ws of observerClients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(event));
     }
   }
 }
@@ -147,6 +165,23 @@ async function handleMessage(ws: WebSocket, message: string) {
 
   try {
     const msg = JSON.parse(message);
+
+    // Handle observer mode (no auth required, receives all events)
+    if (msg.type === 'observe') {
+      data.isObserver = true;
+      observerClients.add(ws);
+
+      ws.send(JSON.stringify({
+        type: 'observer_connected',
+        timestamp: new Date().toISOString(),
+        data: {
+          message: 'Connected as observer. You will receive all public events.',
+        },
+      }));
+
+      console.log('[WS] Observer connected');
+      return;
+    }
 
     // Handle authentication
     if (msg.type === 'auth') {
@@ -251,6 +286,10 @@ function handleClose(ws: WebSocket) {
     unsubscribeFromLocation(data.agentId, data.locationId);
     console.log(`[WS] ${data.agentName} disconnected`);
   }
+  if (data?.isObserver) {
+    observerClients.delete(ws);
+    console.log('[WS] Observer disconnected');
+  }
   clientData.delete(ws);
 }
 
@@ -284,6 +323,7 @@ export function createWebSocketServer(port: number): WebSocketServer {
       locationId: '',
       compact: false,
       authenticated: false,
+      isObserver: false,
     });
 
     ws.on('message', (message: Buffer) => {
@@ -364,6 +404,11 @@ export async function initRedisSubscriber() {
         // Broadcast to all participants
         if (data.participantIds) {
           broadcastToAgents(data.participantIds, event, data.authorId);
+        }
+
+        // Also broadcast to observers (for public conversations)
+        if (data.isPublic !== false) {
+          broadcastToObservers(event);
         }
       } catch (error) {
         console.error('[WS] Error processing conversation message:', error);
