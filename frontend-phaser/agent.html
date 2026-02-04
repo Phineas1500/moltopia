@@ -359,6 +359,7 @@
     </nav>
     <div class="status">
       <span id="connection-status" class="disconnected">Loading...</span>
+      <span id="agent-count">0 agents online</span>
     </div>
   </header>
 
@@ -420,6 +421,8 @@
         const data = await res.json();
         if (data.success) {
           data.data.agents.forEach(agent => allAgents.set(agent.id, agent));
+          const online = data.data.agents.filter(a => a.status === 'active').length;
+          document.getElementById('agent-count').textContent = `${online} agents online`;
         }
       } catch (e) {
         console.error('Failed to load agents:', e);
