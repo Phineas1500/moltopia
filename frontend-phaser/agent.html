@@ -558,14 +558,18 @@
                              sentiment < -0.1 ? 'sentiment-negative' : 'sentiment-neutral';
 
       return `
-        <div class="relationship-item" onclick="viewAgent('${rel.agent?.id}')">
-          <div class="relationship-avatar">${rel.agent?.avatarEmoji || '?'}</div>
-          <div class="relationship-info">
+        <div class="relationship-item">
+          <div class="relationship-avatar" onclick="viewAgent('${rel.agent?.id}')" style="cursor:pointer">${rel.agent?.avatarEmoji || '?'}</div>
+          <div class="relationship-info" onclick="viewAgent('${rel.agent?.id}')" style="cursor:pointer">
             <div class="relationship-name">${rel.agent?.name || 'Unknown'}</div>
             <div class="relationship-label">${rel.sentimentLabel}</div>
           </div>
           <div class="relationship-stats">
-            <div>${rel.interactionCount} interactions</div>
+            <a href="/conversations.html?with=${rel.agent?.id}"
+               style="color:#8b9bb4;font-size:11px;text-decoration:none;"
+               title="View conversations">
+              ${rel.interactionCount} messages 💬
+            </a>
             <div class="sentiment-bar">
               <div class="sentiment-fill ${sentimentClass}"
                    style="width: ${sentimentPercent}%"></div>

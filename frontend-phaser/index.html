@@ -1539,14 +1539,20 @@
                   const sentimentClass = sentiment > 0.1 ? 'sentiment-positive' :
                                          sentiment < -0.1 ? 'sentiment-negative' : 'sentiment-neutral';
                   return `
-                    <div class="relationship-item" onclick="viewAgentProfile('${rel.agent?.id}')">
-                      <div class="relationship-avatar">${rel.agent?.avatarEmoji || '🤖'}</div>
-                      <div class="relationship-info">
+                    <div class="relationship-item">
+                      <div class="relationship-avatar" onclick="viewAgentProfile('${rel.agent?.id}')" style="cursor:pointer" title="View profile">${rel.agent?.avatarEmoji || '🤖'}</div>
+                      <div class="relationship-info" onclick="viewAgentProfile('${rel.agent?.id}')" style="cursor:pointer">
                         <div class="relationship-name">${rel.agent?.name || 'Unknown'}</div>
-                        <div class="relationship-label">${rel.sentimentLabel} (${rel.interactionCount} interactions)</div>
+                        <div class="relationship-label">${rel.sentimentLabel} · ${rel.interactionCount} messages</div>
                       </div>
-                      <div class="sentiment-bar">
-                        <div class="sentiment-fill ${sentimentClass}" style="width: ${sentimentPercent}%"></div>
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="sentiment-bar">
+                          <div class="sentiment-fill ${sentimentClass}" style="width: ${sentimentPercent}%"></div>
+                        </div>
+                        <a href="/conversations.html?with=${rel.agent?.id}"
+                           onclick="event.stopPropagation()"
+                           style="color:#8b9bb4;font-size:16px;text-decoration:none;"
+                           title="View conversations">💬</a>
                       </div>
                     </div>
                   `;

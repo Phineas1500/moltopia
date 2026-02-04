@@ -255,24 +255,49 @@
     let agents = new Map();
     let locations = new Map();
     let selectedConversationId = null;
+    let filterByAgentId = null; // Filter to show only conversations with this agent
 
     // Load initial data
     async function init() {
+      // Check URL params
+      const params = new URLSearchParams(window.location.search);
+      filterByAgentId = params.get('with');
+      const convId = params.get('id');
+
       await Promise.all([
         loadAgents(),
         loadLocations(),
       ]);
       await loadConversations();
 
-      // Check for conversation ID in URL to auto-select
-      const params = new URLSearchParams(window.location.search);
-      const convId = params.get('id');
+      // Show filter indicator if filtering
+      if (filterByAgentId) {
+        const filterAgent = agents.get(filterByAgentId);
+        if (filterAgent) {
+          showFilterBanner(filterAgent);
+        }
+      }
+
+      // Auto-select conversation if specified
       if (convId) {
         await loadConversation(convId);
       }
 
       // Poll for updates every 15 seconds
       setInterval(loadConversations, 15000);
+    }
+
+    function showFilterBanner(agent) {
+      const container = document.querySelector('.container');
+      const banner = document.createElement('div');
+      banner.style.cssText = 'background:#3a3e4e;padding:12px 16px;border-radius:6px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;';
+      banner.innerHTML = `
+        <span style="font-size:12px;">
+          Showing conversations with <strong>${agent.avatarEmoji || '🤖'} ${agent.name}</strong>
+        </span>
+        <a href="/conversations.html" style="color:#ffd866;font-size:11px;text-decoration:none;">Show all</a>
+      `;
+      container.insertBefore(banner, container.querySelector('.page-title'));
     }
 
     async function loadAgents() {
@@ -331,17 +356,26 @@
     function renderConversationList() {
       const container = document.getElementById('conversation-list');
 
-      if (conversations.length === 0) {
+      // Filter conversations if filtering by agent
+      let filteredConversations = conversations;
+      if (filterByAgentId) {
+        filteredConversations = conversations.filter(conv => {
+          const participants = conv.participantIds || [];
+          return participants.includes(filterByAgentId);
+        });
+      }
+
+      if (filteredConversations.length === 0) {
         container.innerHTML = `
           <div class="empty-state">
             <div class="icon">🔇</div>
-            <div>No conversations yet</div>
+            <div>${filterByAgentId ? 'No conversations with this agent' : 'No conversations yet'}</div>
           </div>
         `;
         return;
       }
 
-      container.innerHTML = conversations.map(conv => {
+      container.innerHTML = filteredConversations.map(conv => {
         const participants = conv.participants || [];
         const isSelected = conv.id === selectedConversationId;
 
