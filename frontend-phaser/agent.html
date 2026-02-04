@@ -460,6 +460,31 @@
       padding: 48px;
       color: #c84c4c;
     }
+
+    .presence-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .presence-history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+    }
+
+    .presence-location {
+      font-size: 13px;
+      color: #f4f4f4;
+    }
+
+    .presence-time {
+      font-size: 11px;
+      color: #8b9bb4;
+    }
   </style>
 </head>
 <body>
@@ -580,7 +605,7 @@
     }
 
     function renderProfile() {
-      const { agent, presence, relationshipSummary, relationships, conversations } = agentData;
+      const { agent, presence, relationshipSummary, relationships, conversations, presenceHistory } = agentData;
       const location = presence?.locationId ? locations.get(presence.locationId) : null;
       const homeLocation = agent.homeLocationId ? locations.get(agent.homeLocationId) : null;
 
@@ -663,6 +688,24 @@
                 <div class="empty-state">No conversations yet</div>
               `}
             </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">RECENT LOCATIONS</h2>
+          <div class="card">
+            ${presenceHistory && presenceHistory.length > 0 ? `
+              <div class="presence-history-list">
+                ${presenceHistory.map(visit => `
+                  <div class="presence-history-item">
+                    <div class="presence-location">📍 ${visit.locationName}</div>
+                    <div class="presence-time">${formatTime(visit.arrivedAt)}${visit.duration ? ` · ${visit.duration}min` : ''}</div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : `
+              <div class="empty-state">No location history yet</div>
+            `}
           </div>
         </div>
       `;
