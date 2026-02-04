@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
 import { conversations, conversationMessages, worldEvents, agents } from '../db/schema.js';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { PubSub } from './cache.service.js';
 import { RelationshipService } from './relationship.service.js';
 
@@ -140,5 +140,64 @@ export const ConversationService = {
     return db.query.conversations.findFirst({
       where: eq(conversations.id, id),
     });
+  },
+
+  /**
+   * Get all conversations (for observer view)
+   */
+  async getAllConversations(params: { limit?: number; offset?: number }) {
+    const { limit = 50, offset = 0 } = params;
+
+    const convos = await db.query.conversations.findMany({
+      limit,
+      offset,
+      orderBy: (conversations, { desc }) => [desc(conversations.lastMessageAt)],
+    });
+
+    // Enrich with participant names
+    const enrichedConvos = await Promise.all(
+      convos.map(async (conv) => {
+        const participantIds = conv.participantIds as string[];
+        const participants = participantIds.length > 0
+          ? await db
+              .select({ id: agents.id, name: agents.name, avatarEmoji: agents.avatarEmoji })
+              .from(agents)
+              .where(inArray(agents.id, participantIds))
+          : [];
+
+        // Get last message preview
+        const [lastMessage] = await db.query.conversationMessages.findMany({
+          where: eq(conversationMessages.conversationId, conv.id),
+          limit: 1,
+          orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+          with: {
+            author: {
+              columns: { name: true },
+            },
+          },
+        });
+
+        // Get message count
+        const [{ count }] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(conversationMessages)
+          .where(eq(conversationMessages.conversationId, conv.id));
+
+        return {
+          ...conv,
+          participants,
+          lastMessage: lastMessage
+            ? {
+                authorName: lastMessage.author?.name,
+                content: lastMessage.content.substring(0, 100),
+                createdAt: lastMessage.createdAt,
+              }
+            : null,
+          messageCount: Number(count),
+        };
+      })
+    );
+
+    return enrichedConvos;
   },
 };

@@ -57,7 +57,7 @@ conversations.post('/', authMiddleware, async (c) => {
 });
 
 /**
- * Get agent's conversations
+ * Get agent's conversations (authenticated)
  */
 conversations.get('/', authMiddleware, async (c) => {
   const agentId = c.get('agentId') as string;
@@ -71,7 +71,22 @@ conversations.get('/', authMiddleware, async (c) => {
 });
 
 /**
- * Get conversation by ID
+ * Get all conversations (public observer endpoint)
+ */
+conversations.get('/all', async (c) => {
+  const limit = parseInt(c.req.query('limit') || '50');
+  const offset = parseInt(c.req.query('offset') || '0');
+
+  const conversationList = await ConversationService.getAllConversations({ limit, offset });
+
+  return c.json({
+    success: true,
+    data: { conversations: conversationList },
+  });
+});
+
+/**
+ * Get conversation by ID (authenticated - for participants)
  */
 conversations.get('/:id', authMiddleware, async (c) => {
   const agentId = c.get('agentId') as string;
@@ -91,6 +106,33 @@ conversations.get('/:id', authMiddleware, async (c) => {
 
   // Get messages
   const limit = parseInt(c.req.query('limit') || '50');
+  const offset = parseInt(c.req.query('offset') || '0');
+
+  const messages = await ConversationService.getMessages(id, { limit, offset });
+
+  return c.json({
+    success: true,
+    data: {
+      conversation,
+      messages,
+    },
+  });
+});
+
+/**
+ * Get conversation by ID (public observer endpoint)
+ */
+conversations.get('/view/:id', async (c) => {
+  const id = c.req.param('id');
+
+  const conversation = await ConversationService.getConversation(id);
+
+  if (!conversation) {
+    return c.json({ success: false, error: 'Conversation not found' }, 404);
+  }
+
+  // Get messages
+  const limit = parseInt(c.req.query('limit') || '100');
   const offset = parseInt(c.req.query('offset') || '0');
 
   const messages = await ConversationService.getMessages(id, { limit, offset });
