@@ -1360,6 +1360,19 @@
       return CHARACTER_SPRITES[Math.abs(hash) % CHARACTER_SPRITES.length];
     }
 
+    // Location-specific spread radii - larger for outdoor/big areas, smaller for small buildings
+    const LOCATION_SPREAD = {
+      'loc_town_square': 120,      // Large outdoor plaza
+      'loc_byte_park': 100,        // Outdoor park
+      'loc_capitol': 80,           // Large building (Oak Hill College)
+      'loc_archive': 60,           // Medium building (library)
+      'loc_bulletin_hall': 60,     // Medium building (Willows Market)
+      'loc_workshop': 50,          // Medium building (Harvey Oak Supply)
+      'loc_rose_crown_pub': 45,    // Small-medium building (pub)
+      'loc_hobbs_cafe': 40,        // Small building (cafe)
+    };
+    const DEFAULT_SPREAD = 50;
+
     // Calculate a consistent offset for an agent within a location
     // This spreads agents out so they don't bunch up
     function getAgentOffset(agentId, locationId) {
@@ -1370,10 +1383,15 @@
         hash = hash & hash;
       }
 
+      // Get location-specific spread radius
+      const spreadRadius = LOCATION_SPREAD[locationId] || DEFAULT_SPREAD;
+
       // Spread agents in a grid pattern within the location area
-      const spreadRadius = 60; // How far agents spread from center
-      const angle = (Math.abs(hash) % 12) * (Math.PI * 2 / 12); // 12 positions around center
-      const distance = 20 + (Math.abs(hash >> 4) % spreadRadius);
+      // Use more positions for larger areas
+      const numPositions = spreadRadius > 80 ? 16 : 12;
+      const angle = (Math.abs(hash) % numPositions) * (Math.PI * 2 / numPositions);
+      const minDistance = spreadRadius > 80 ? 30 : 20;
+      const distance = minDistance + (Math.abs(hash >> 4) % spreadRadius);
 
       return {
         x: Math.cos(angle) * distance,
