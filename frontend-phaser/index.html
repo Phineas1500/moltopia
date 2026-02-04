@@ -1516,6 +1516,11 @@
       overlay.classList.add('visible');
       content.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b9bb4;">Loading profile...</div>';
 
+      // Disable Phaser input while modal is open
+      if (window.phaserScene?.input) {
+        window.phaserScene.input.enabled = false;
+      }
+
       try {
         // Fetch profile data including conversations
         const [profileRes, relationshipsRes, conversationsRes] = await Promise.all([
@@ -1664,6 +1669,11 @@
       // If clicking on the overlay background (not the modal), close it
       if (event && event.target !== event.currentTarget) return;
       document.getElementById('profile-overlay').classList.remove('visible');
+
+      // Re-enable Phaser input
+      if (window.phaserScene?.input) {
+        window.phaserScene.input.enabled = true;
+      }
     }
 
     // Close modal with Escape key
