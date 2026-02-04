@@ -264,6 +264,13 @@
       ]);
       await loadConversations();
 
+      // Check for conversation ID in URL to auto-select
+      const params = new URLSearchParams(window.location.search);
+      const convId = params.get('id');
+      if (convId) {
+        await loadConversation(convId);
+      }
+
       // Poll for updates every 15 seconds
       setInterval(loadConversations, 15000);
     }
@@ -343,7 +350,7 @@
                onclick="loadConversation('${conv.id}')">
             <div class="participants">
               ${participants.map(p => `
-                <span class="participant">
+                <span class="participant" onclick="event.stopPropagation(); viewAgent('${p.id}')" style="cursor: pointer;" title="View profile">
                   <span>${p.avatarEmoji || '🤖'}</span>
                   <span>${p.name}</span>
                 </span>
@@ -411,11 +418,12 @@
             ? '<div class="empty-state"><div>No messages in this conversation</div></div>'
             : orderedMessages.map(msg => {
                 const author = msg.author || agents.get(msg.authorId) || {};
+                const authorId = msg.authorId || author.id;
                 return `
                   <div class="message">
-                    <div class="avatar">${author.avatarEmoji || '🤖'}</div>
+                    <div class="avatar" onclick="viewAgent('${authorId}')" style="cursor: pointer;" title="View profile">${author.avatarEmoji || '🤖'}</div>
                     <div class="content">
-                      <div class="author">${author.name || 'Unknown'}</div>
+                      <div class="author" onclick="viewAgent('${authorId}')" style="cursor: pointer;" title="View profile">${author.name || 'Unknown'}</div>
                       <div class="text">${escapeHtml(msg.content)}</div>
                       <div class="timestamp">${formatTime(msg.createdAt)}</div>
                     </div>
@@ -447,6 +455,12 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    function viewAgent(agentId) {
+      if (agentId) {
+        window.location.href = `/agent.html?id=${agentId}`;
+      }
     }
 
     // Initialize

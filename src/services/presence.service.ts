@@ -262,6 +262,18 @@ export const PresenceService = {
   },
 
   /**
+   * Get agent's current presence
+   */
+  async getPresence(agentId: string) {
+    return db.query.presence.findFirst({
+      where: eq(presence.agentId, agentId),
+      with: {
+        location: true,
+      },
+    });
+  },
+
+  /**
    * Get all agents at a location
    */
   async getAgentsAtLocation(locationId: string) {

@@ -178,7 +178,7 @@
       </div>
 
       <div class="instructions">
-        Drag to pan | Scroll to zoom | Arrow keys also work
+        Drag to pan | Scroll to zoom | Click agents for profile
       </div>
     </div>
   </div>
@@ -908,6 +908,12 @@
         sprite.scaleY = sprite.scaleX;
         sprite.setDepth(1);
 
+        // Make sprite clickable to view profile
+        sprite.setInteractive({ useHandCursor: true });
+        sprite.on('pointerdown', () => {
+          viewAgentProfile(agent.id);
+        });
+
         agentSprites[agent.id] = sprite;
         agentCurrentPos[agent.id] = { x: startX, y: startY };
         agentTargets[agent.id] = { x: targetX, y: targetY, locationId: agent.locationId };
@@ -929,6 +935,10 @@
         });
         nameTag.setOrigin(0.5, 0);
         nameTag.setDepth(3);
+        nameTag.setInteractive({ useHandCursor: true });
+        nameTag.on('pointerdown', () => {
+          viewAgentProfile(agent.id);
+        });
         agentNameTags[agent.id] = nameTag;
 
         // Create walking animations for this sprite
@@ -1168,9 +1178,21 @@
           </div>
         `;
 
-        card.addEventListener('click', () => focusOnAgent(agent));
+        // Click to view profile, shift+click to focus on map
+        card.addEventListener('click', (e) => {
+          if (e.shiftKey) {
+            focusOnAgent(agent);
+          } else {
+            viewAgentProfile(agent.id);
+          }
+        });
+        card.title = 'Click for profile, Shift+click to locate';
         agentList.appendChild(card);
       });
+    }
+
+    function viewAgentProfile(agentId) {
+      window.location.href = `/agent.html?id=${agentId}`;
     }
 
     function focusOnAgent(agent) {

@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { AgentService } from '../../services/agent.service.js';
 import { PresenceService } from '../../services/presence.service.js';
+import { RelationshipService } from '../../services/relationship.service.js';
+import { ConversationService } from '../../services/conversation.service.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
@@ -94,6 +96,70 @@ agents.patch('/me', authMiddleware, async (c) => {
   return c.json({
     success: true,
     data: { agent },
+  });
+});
+
+/**
+ * Get agent's relationships
+ */
+agents.get('/:id/relationships', async (c) => {
+  const id = c.req.param('id');
+
+  const agent = await AgentService.getAgent(id);
+  if (!agent) {
+    return c.json({ success: false, error: 'Agent not found' }, 404);
+  }
+
+  const relationships = await RelationshipService.getAgentRelationships(id);
+
+  return c.json({
+    success: true,
+    data: { relationships },
+  });
+});
+
+/**
+ * Get agent's conversations
+ */
+agents.get('/:id/conversations', async (c) => {
+  const id = c.req.param('id');
+
+  const agent = await AgentService.getAgent(id);
+  if (!agent) {
+    return c.json({ success: false, error: 'Agent not found' }, 404);
+  }
+
+  const convos = await ConversationService.getAgentConversations(id);
+
+  return c.json({
+    success: true,
+    data: { conversations: convos },
+  });
+});
+
+/**
+ * Get full agent profile (agent + presence + relationships summary)
+ */
+agents.get('/:id/profile', async (c) => {
+  const id = c.req.param('id');
+
+  const agent = await AgentService.getAgent(id);
+  if (!agent) {
+    return c.json({ success: false, error: 'Agent not found' }, 404);
+  }
+
+  const presence = await PresenceService.getPresence(id);
+  const relationshipSummary = await RelationshipService.getRelationshipSummary(id);
+  const recentConversations = await ConversationService.getAgentConversations(id);
+
+  return c.json({
+    success: true,
+    data: {
+      agent,
+      presence,
+      relationshipSummary,
+      recentConversations: recentConversations.slice(0, 5),
+    },
   });
 });
 
