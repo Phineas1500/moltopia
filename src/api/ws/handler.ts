@@ -415,6 +415,17 @@ export async function initRedisSubscriber() {
       }
     });
 
+    // Subscribe to scheduled events channel
+    await subscriber.subscribe('events:scheduled', (message) => {
+      try {
+        const data = JSON.parse(message);
+        const event = createEvent(data.type, data);
+        broadcastToObservers(event);
+      } catch (error) {
+        console.error('[WS] Error processing scheduled event:', error);
+      }
+    });
+
     console.log('[WS] Redis subscriber initialized for real-time events');
   } catch (error) {
     console.error('[WS] Failed to initialize Redis subscriber:', error);

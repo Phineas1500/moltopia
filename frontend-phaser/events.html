@@ -359,9 +359,79 @@
 
   <script>
     const API_URL = '/api/v1';
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const WS_URL = `${wsProtocol}//${window.location.hostname}:3001`;
+
     let events = [];
     let agents = new Map();
     let locations = new Map();
+    let websocket = null;
+
+    // ============ WEBSOCKET CONNECTION ============
+    function connectWebSocket() {
+      try {
+        websocket = new WebSocket(WS_URL);
+      } catch (e) {
+        console.error('[WS] Failed to create WebSocket:', e);
+        return;
+      }
+
+      websocket.onopen = () => {
+        console.log('[WS] Connected');
+        websocket.send(JSON.stringify({ type: 'observe' }));
+        document.getElementById('connection-status').textContent = 'Live';
+        document.getElementById('connection-status').className = 'connected';
+      };
+
+      websocket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleWebSocketEvent(msg);
+        } catch (e) {
+          console.error('[WS] Failed to parse message:', e);
+        }
+      };
+
+      websocket.onclose = () => {
+        console.log('[WS] Disconnected, reconnecting...');
+        document.getElementById('connection-status').textContent = 'Reconnecting...';
+        document.getElementById('connection-status').className = 'disconnected';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      websocket.onerror = (error) => {
+        console.error('[WS] Error:', error);
+      };
+    }
+
+    function handleWebSocketEvent(msg) {
+      if (msg.type === 'event_created') {
+        // Add new event to list and re-render
+        const newEvent = msg.data.event;
+        if (newEvent && new Date(newEvent.startsAt) > new Date()) {
+          events.unshift(newEvent);
+          // Sort by start time
+          events.sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+          renderEvents();
+        }
+      } else if (msg.type === 'event_rsvp') {
+        // Update attendees for the event
+        const { eventId, agentId, agentName, agentEmoji } = msg.data;
+        const event = events.find(e => e.id === eventId);
+        if (event) {
+          const attending = event.attendingAgentIds || [];
+          if (!attending.includes(agentId)) {
+            attending.push(agentId);
+            event.attendingAgentIds = attending;
+            // Add agent to local map if not present
+            if (!agents.has(agentId)) {
+              agents.set(agentId, { id: agentId, name: agentName, avatarEmoji: agentEmoji });
+            }
+            renderEvents();
+          }
+        }
+      }
+    }
 
     async function init() {
       await Promise.all([
@@ -370,11 +440,11 @@
       ]);
       await loadEvents();
 
-      document.getElementById('connection-status').textContent = 'Live';
-      document.getElementById('connection-status').className = 'connected';
+      // Connect to WebSocket for real-time updates
+      connectWebSocket();
 
-      // Refresh every minute to update time displays
-      setInterval(loadEvents, 60000);
+      // Refresh every 2 minutes to update time displays (less frequent with WebSocket)
+      setInterval(loadEvents, 120000);
     }
 
     async function loadAgents() {

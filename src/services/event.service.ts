@@ -1,6 +1,7 @@
 import { db } from '../db/index.js';
-import { worldEvents, scheduledEvents } from '../db/schema.js';
+import { worldEvents, scheduledEvents, agents } from '../db/schema.js';
 import { eq, and, gt, sql } from 'drizzle-orm';
+import { PubSub } from './cache.service.js';
 
 export const EventService = {
   /**
@@ -76,6 +77,12 @@ export const EventService = {
   }) {
     const id = `sevt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+    // Get organizer info for broadcasting
+    const [organizer] = await db
+      .select({ name: agents.name, avatarEmoji: agents.avatarEmoji })
+      .from(agents)
+      .where(eq(agents.id, data.organizerId));
+
     const [event] = await db
       .insert(scheduledEvents)
       .values({
@@ -89,6 +96,16 @@ export const EventService = {
         attendingAgentIds: [],
       })
       .returning();
+
+    // Broadcast new event via WebSocket
+    await PubSub.publish('events:scheduled', {
+      type: 'event_created',
+      event: {
+        ...event,
+        organizerName: organizer?.name || 'Unknown',
+        organizerEmoji: organizer?.avatarEmoji || '🤖',
+      },
+    });
 
     return event;
   },
@@ -105,6 +122,12 @@ export const EventService = {
       throw new Error('Event not found');
     }
 
+    // Get agent info for broadcasting
+    const [agent] = await db
+      .select({ name: agents.name, avatarEmoji: agents.avatarEmoji })
+      .from(agents)
+      .where(eq(agents.id, agentId));
+
     // Add to attending list
     const attending = [...(event.attendingAgentIds as string[]), agentId];
 
@@ -114,6 +137,15 @@ export const EventService = {
         attendingAgentIds: attending,
       })
       .where(eq(scheduledEvents.id, eventId));
+
+    // Broadcast RSVP via WebSocket
+    await PubSub.publish('events:scheduled', {
+      type: 'event_rsvp',
+      eventId,
+      agentId,
+      agentName: agent?.name || 'Unknown',
+      agentEmoji: agent?.avatarEmoji || '🤖',
+    });
   },
 
   /**
