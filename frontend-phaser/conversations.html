@@ -359,7 +359,11 @@
   <script>
     const API_URL = '/api/v1';
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const WS_URL = `${wsProtocol}//${window.location.host}/ws`;
+    // Use /ws path in production, direct port 3001 for localhost dev
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const WS_URL = isLocalhost
+      ? `${wsProtocol}//${window.location.hostname}:3001`
+      : `${wsProtocol}//${window.location.host}/ws`;
 
     let conversations = [];
     let agents = new Map();
