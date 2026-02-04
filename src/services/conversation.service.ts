@@ -87,7 +87,9 @@ export const ConversationService = {
         messageId: message.id,
         authorId,
         authorName: author?.name || 'Unknown',
+        authorEmoji: author?.avatarEmoji || '🤖',
         content: content.substring(0, 200),
+        createdAt: message.createdAt.toISOString(),
         isPublic: conversation.isPublic,
         participantIds,
       });

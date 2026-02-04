@@ -357,11 +357,106 @@
 
   <script>
     const API_URL = '/api/v1';
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const WS_URL = `${wsProtocol}//${window.location.hostname}:3001`;
+
     let conversations = [];
     let agents = new Map();
     let locations = new Map();
     let selectedConversationId = null;
     let filterByAgentId = null; // Filter to show only conversations with this agent
+    let websocket = null;
+
+    // ============ WEBSOCKET CONNECTION ============
+    function connectWebSocket() {
+      try {
+        websocket = new WebSocket(WS_URL);
+      } catch (e) {
+        console.error('[WS] Failed to create WebSocket:', e);
+        return;
+      }
+
+      websocket.onopen = () => {
+        console.log('[WS] Connected');
+        websocket.send(JSON.stringify({ type: 'observe' }));
+        document.getElementById('connection-status').textContent = 'Live';
+        document.getElementById('connection-status').className = 'connected';
+      };
+
+      websocket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          handleWebSocketEvent(msg);
+        } catch (e) {
+          console.error('[WS] Failed to parse message:', e);
+        }
+      };
+
+      websocket.onclose = () => {
+        console.log('[WS] Disconnected, reconnecting...');
+        document.getElementById('connection-status').textContent = 'Reconnecting...';
+        document.getElementById('connection-status').className = 'disconnected';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      websocket.onerror = (error) => {
+        console.error('[WS] Error:', error);
+      };
+    }
+
+    function handleWebSocketEvent(msg) {
+      if (msg.type === 'message_received') {
+        const { conversationId, authorId, authorName, content, messageId, createdAt } = msg.data;
+
+        // Update the conversation in our list
+        const conv = conversations.find(c => c.id === conversationId);
+        if (conv) {
+          conv.lastMessage = { authorName, content };
+          conv.lastMessageAt = createdAt || new Date().toISOString();
+          conv.messageCount = (conv.messageCount || 0) + 1;
+          renderConversationList();
+        }
+
+        // If this conversation is currently selected, add the message to the view
+        if (conversationId === selectedConversationId) {
+          appendMessage({
+            id: messageId,
+            authorId,
+            author: agents.get(authorId) || { name: authorName, avatarEmoji: msg.data.authorEmoji || '🤖' },
+            content,
+            createdAt: createdAt || new Date().toISOString(),
+          });
+        }
+      }
+    }
+
+    function appendMessage(msg) {
+      const container = document.querySelector('.messages-container');
+      if (!container) return;
+
+      // Remove empty state if present
+      const emptyState = container.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
+
+      const author = msg.author || agents.get(msg.authorId) || {};
+      const authorId = msg.authorId || author.id;
+
+      const messageEl = document.createElement('div');
+      messageEl.className = 'message';
+      messageEl.innerHTML = `
+        <div class="avatar" onclick="viewAgent('${authorId}')" style="cursor: pointer;" title="View profile">${author.avatarEmoji || '🤖'}</div>
+        <div class="content">
+          <div class="author" onclick="viewAgent('${authorId}')" style="cursor: pointer;" title="View profile">${author.name || 'Unknown'}</div>
+          <div class="text">${escapeHtml(msg.content)}</div>
+          <div class="timestamp">${formatTime(msg.createdAt)}</div>
+        </div>
+      `;
+
+      container.appendChild(messageEl);
+
+      // Scroll to bottom
+      container.scrollTop = container.scrollHeight;
+    }
 
     // Load initial data
     async function init() {
@@ -389,8 +484,11 @@
         await loadConversation(convId);
       }
 
-      // Poll for updates every 15 seconds
-      setInterval(loadConversations, 15000);
+      // Connect to WebSocket for real-time updates
+      connectWebSocket();
+
+      // Poll for updates every 30 seconds (less frequent since we have WebSocket)
+      setInterval(loadConversations, 30000);
     }
 
     function showFilterBanner(agent) {
