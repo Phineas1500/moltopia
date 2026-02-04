@@ -216,14 +216,14 @@ export const transactions = pgTable(
   })
 );
 
-// Items - Catalog of things agents can buy/own
+// Items - Catalog of things agents can buy/own (includes crafted items)
 export const items = pgTable(
   'items',
   {
     id: text('id').primaryKey(),
     name: varchar('name', { length: 100 }).notNull(),
     description: text('description'),
-    category: varchar('category', { length: 30 }).notNull(), // consumable, collectible, tool, decoration
+    category: varchar('category', { length: 30 }).notNull(), // consumable, collectible, tool, decoration, base_element, crafted
     basePrice: integer('base_price').notNull(), // In cents
     emoji: varchar('emoji', { length: 10 }),
     effects: jsonb('effects').default({}).notNull(), // What the item does
@@ -231,10 +231,87 @@ export const items = pgTable(
     limited: boolean('limited').default(false).notNull(), // Limited supply?
     maxSupply: integer('max_supply'), // null = unlimited
     currentSupply: integer('current_supply').default(0).notNull(), // How many exist
+    // Crafting-specific fields
+    discoveredBy: text('discovered_by').references(() => agents.id), // Who first crafted it
+    recipe: jsonb('recipe'), // {ingredient1: "item_id", ingredient2: "item_id"}
+    craftCount: integer('craft_count').default(0).notNull(), // How many times crafted
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   (table) => ({
     categoryIdx: index('items_category_idx').on(table.category),
+    discoveredByIdx: index('items_discovered_by_idx').on(table.discoveredBy),
+  })
+);
+
+// Market Orders - Buy/sell orders for items
+export const marketOrders = pgTable(
+  'market_orders',
+  {
+    id: text('id').primaryKey(),
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    orderType: varchar('order_type', { length: 10 }).notNull(), // 'buy' or 'sell'
+    price: integer('price').notNull(), // Price per unit in cents
+    quantity: integer('quantity').notNull(), // Total quantity
+    filledQuantity: integer('filled_quantity').default(0).notNull(), // How much has been filled
+    status: varchar('status', { length: 20 }).default('open').notNull(), // open, filled, cancelled, expired
+    expiresAt: timestamp('expires_at'), // When the order expires
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    agentIdx: index('market_orders_agent_idx').on(table.agentId),
+    itemIdx: index('market_orders_item_idx').on(table.itemId),
+    statusIdx: index('market_orders_status_idx').on(table.status),
+    priceIdx: index('market_orders_price_idx').on(table.itemId, table.orderType, table.price),
+  })
+);
+
+// Market Trades - Completed trades (price history)
+export const marketTrades = pgTable(
+  'market_trades',
+  {
+    id: text('id').primaryKey(),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    buyerId: text('buyer_id')
+      .notNull()
+      .references(() => agents.id),
+    sellerId: text('seller_id')
+      .notNull()
+      .references(() => agents.id),
+    price: integer('price').notNull(), // Price per unit in cents
+    quantity: integer('quantity').notNull(),
+    buyOrderId: text('buy_order_id').references(() => marketOrders.id),
+    sellOrderId: text('sell_order_id').references(() => marketOrders.id),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    itemIdx: index('market_trades_item_idx').on(table.itemId),
+    createdAtIdx: index('market_trades_created_at_idx').on(table.createdAt),
+  })
+);
+
+// Discovery badges - Awarded for first discoveries
+export const discoveryBadges = pgTable(
+  'discovery_badges',
+  {
+    id: text('id').primaryKey(),
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    discoveredAt: timestamp('discovered_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    agentIdx: index('discovery_badges_agent_idx').on(table.agentId),
+    itemIdx: index('discovery_badges_item_idx').on(table.itemId),
   })
 );
 
@@ -380,5 +457,43 @@ export const tradesRelations = relations(trades, ({ one }) => ({
   toAgent: one(agents, {
     fields: [trades.toAgentId],
     references: [agents.id],
+  }),
+}));
+
+// Market relations
+export const marketOrdersRelations = relations(marketOrders, ({ one }) => ({
+  agent: one(agents, {
+    fields: [marketOrders.agentId],
+    references: [agents.id],
+  }),
+  item: one(items, {
+    fields: [marketOrders.itemId],
+    references: [items.id],
+  }),
+}));
+
+export const marketTradesRelations = relations(marketTrades, ({ one }) => ({
+  item: one(items, {
+    fields: [marketTrades.itemId],
+    references: [items.id],
+  }),
+  buyer: one(agents, {
+    fields: [marketTrades.buyerId],
+    references: [agents.id],
+  }),
+  seller: one(agents, {
+    fields: [marketTrades.sellerId],
+    references: [agents.id],
+  }),
+}));
+
+export const discoveryBadgesRelations = relations(discoveryBadges, ({ one }) => ({
+  agent: one(agents, {
+    fields: [discoveryBadges.agentId],
+    references: [agents.id],
+  }),
+  item: one(items, {
+    fields: [discoveryBadges.itemId],
+    references: [items.id],
   }),
 }));

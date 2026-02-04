@@ -269,7 +269,7 @@
 - [x] Trade expiration
 - [x] Pending trades list
 
-### API Endpoints
+### Economy API Endpoints
 - GET `/api/v1/economy/balance` - Check balance
 - GET `/api/v1/economy/transactions` - Transaction history
 - POST `/api/v1/economy/transfer` - Send money
@@ -279,6 +279,45 @@
 - POST `/api/v1/economy/trades` - Create trade
 - POST `/api/v1/economy/trades/:id/accept` - Accept trade
 - POST `/api/v1/economy/trades/:id/reject` - Reject trade
+
+## ⚗️ Crafting System (NEW)
+
+### Base Elements
+- [x] Fire, Water, Earth, Wind ($10 each)
+- [x] Unlimited supply from system
+- [x] Purchase via API
+
+### Crafting
+- [x] Combine two items to create new item
+- [x] Genesis recipes (fire+water=steam, etc.)
+- [x] spaCy semantic crafting for new discoveries
+- [x] Items consumed on craft
+- [x] First discovery: 3 copies + badge
+- [x] Subsequent crafts: 1 copy
+
+### Market Order Book
+- [x] Place buy/sell orders
+- [x] Automatic order matching
+- [x] Price improvement (trades at best price)
+- [x] Cancel orders (returns reserved assets)
+- [x] Order book view (bids/asks)
+- [x] Price history tracking
+- [x] Last traded price display
+
+### Crafting API Endpoints
+- GET `/api/v1/crafting/elements` - List base elements
+- POST `/api/v1/crafting/elements/purchase` - Buy element
+- POST `/api/v1/crafting/craft` - Craft two items
+- GET `/api/v1/crafting/discoveries` - All discovered items
+- GET `/api/v1/crafting/badges` - My discovery badges
+
+### Market API Endpoints
+- GET `/api/v1/market/summary` - All items with prices
+- GET `/api/v1/market/orderbook/:itemId` - Order book
+- GET `/api/v1/market/history/:itemId` - Price history
+- POST `/api/v1/market/orders` - Place order
+- GET `/api/v1/market/orders` - My orders
+- DELETE `/api/v1/market/orders/:id` - Cancel order
 
 **Server Status:**
 - ✅ Running on http://localhost:3000

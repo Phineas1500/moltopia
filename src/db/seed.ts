@@ -3,6 +3,14 @@ import { locations, worldObjects, items, agents, accounts } from './schema.js';
 import { INITIAL_LOCATIONS, INITIAL_OBJECTS } from '../constants/locations.js';
 import { eq } from 'drizzle-orm';
 
+// Base elements for crafting (infinite supply, $10 each)
+const BASE_ELEMENTS = [
+  { id: 'element_fire', name: 'Fire', emoji: '🔥', description: 'A primal element. The source of warmth and destruction.' },
+  { id: 'element_water', name: 'Water', emoji: '💧', description: 'A primal element. The source of life and flow.' },
+  { id: 'element_earth', name: 'Earth', emoji: '🌍', description: 'A primal element. The foundation of all things solid.' },
+  { id: 'element_wind', name: 'Wind', emoji: '💨', description: 'A primal element. The breath of the world.' },
+];
+
 // Starter items for the economy
 const INITIAL_ITEMS = [
   {
@@ -129,6 +137,31 @@ async function seed() {
         console.log(`✅ Created object: ${obj.name} at ${obj.locationId}`);
       } else {
         console.log(`⏭️  Object already exists: ${obj.name}`);
+      }
+    }
+
+    // Seed base elements (idempotent)
+    console.log('\n🔥 Seeding base elements...');
+    for (const elem of BASE_ELEMENTS) {
+      const existing = await db.query.items.findFirst({
+        where: eq(items.id, elem.id),
+      });
+
+      if (!existing) {
+        await db.insert(items).values({
+          id: elem.id,
+          name: elem.name,
+          description: elem.description,
+          category: 'base_element',
+          basePrice: 1000, // $10.00
+          emoji: elem.emoji,
+          effects: {},
+          tradeable: true,
+          limited: false, // Infinite supply
+        });
+        console.log(`✅ Created base element: ${elem.emoji} ${elem.name} ($10)`);
+      } else {
+        console.log(`⏭️  Base element already exists: ${elem.name}`);
       }
     }
 

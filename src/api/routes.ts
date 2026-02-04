@@ -9,6 +9,8 @@ import events from './v1/events.js';
 import objects from './v1/objects.js';
 import relationships from './v1/relationships.js';
 import economy from './v1/economy.js';
+import crafting from './v1/crafting.js';
+import market from './v1/market.js';
 
 const api = new Hono();
 
@@ -23,5 +25,7 @@ api.route('/v1/events', events);
 api.route('/v1/objects', objects);
 api.route('/v1/relationships', relationships);
 api.route('/v1/economy', economy);
+api.route('/v1/crafting', crafting);
+api.route('/v1/market', market);
 
 export default api;
