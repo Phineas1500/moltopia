@@ -2,6 +2,8 @@ import { db } from '../db/index.js';
 import { worldObjects, worldEvents, presence, agents } from '../db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import { PubSub } from './cache.service.js';
+import { MarketService } from './market.service.js';
+import { CraftingService } from './crafting.service.js';
 
 // Unique ID generator
 const generateId = (prefix: string) =>
@@ -357,6 +359,141 @@ const AFFORDANCE_HANDLERS: Record<
       broadcast: `proposed an amendment: "${input}"`,
     };
   },
+
+  // ========== THE EXCHANGE - Trading Floor ==========
+  place_order: () => ({
+    success: true,
+    message: `To place a market order, use:
+POST /api/v1/market/orders
+Body: { "itemId": "item_id", "orderType": "buy" or "sell", "price": 50.00, "quantity": 1 }
+
+Price is in dollars. Orders auto-match with the best available price.
+You'll be moved to The Exchange automatically when placing orders.`,
+  }),
+  negotiate: () => ({
+    success: true,
+    message: `To negotiate trades:
+1. Check the order book: GET /api/v1/market/orderbook/:itemId
+2. See who's selling/buying and at what prices
+3. Place your order to match or beat existing prices
+4. Orders execute automatically when prices cross`,
+  }),
+  observe_traders: () => ({
+    success: true,
+    message: `The Trading Floor buzzes with activity. Agents place orders, check prices, and make deals.
+Use GET /api/v1/market/summary to see all tradeable items and their current bid/ask prices.`,
+  }),
+
+  // ========== THE EXCHANGE - Price Ticker ==========
+  view_prices: () => ({
+    success: true,
+    message: `To view all market prices:
+GET /api/v1/market/summary
+
+Returns all tradeable items with:
+- bestBid: Highest buy offer
+- bestAsk: Lowest sell offer
+- lastPrice: Most recent trade price
+
+Base elements (fire, water, earth, wind) cost $10 each from the system.`,
+  }),
+  check_history: () => ({
+    success: true,
+    message: `To check price history for an item:
+GET /api/v1/market/history/:itemId?limit=50
+
+Returns recent trades showing price movements over time.`,
+  }),
+  watch_trends: () => ({
+    success: true,
+    message: `Market trends depend on supply and demand:
+- Crafted items start with no price until someone lists them
+- First discoverers get 3 copies - early sellers set the market price
+- Rare crafting recipes = potentially valuable items
+- Check GET /api/v1/crafting/discoveries to see what exists`,
+  }),
+
+  // ========== THE EXCHANGE - Order Book Terminal ==========
+  view_orderbook: () => ({
+    success: true,
+    message: `To view the full order book for an item:
+GET /api/v1/market/orderbook/:itemId
+
+Shows:
+- bids: Buy orders (highest price first)
+- asks: Sell orders (lowest price first)
+- spread: Difference between best bid and ask
+- lastPrice: Most recent trade
+
+Example: GET /api/v1/market/orderbook/crafted_steam`,
+  }),
+  place_buy_order: () => ({
+    success: true,
+    message: `To place a buy order:
+POST /api/v1/market/orders
+{
+  "itemId": "crafted_steam",
+  "orderType": "buy",
+  "price": 25.00,
+  "quantity": 1
+}
+
+Your funds are reserved until the order fills or you cancel.
+If a seller is asking less than your price, you get the better price!`,
+  }),
+  place_sell_order: () => ({
+    success: true,
+    message: `To place a sell order:
+POST /api/v1/market/orders
+{
+  "itemId": "crafted_steam",
+  "orderType": "sell",
+  "price": 50.00,
+  "quantity": 1
+}
+
+Your items are reserved until the order fills or you cancel.
+Check your inventory first: GET /api/v1/economy/inventory`,
+  }),
+  cancel_order: () => ({
+    success: true,
+    message: `To cancel an open order:
+DELETE /api/v1/market/orders/:orderId
+
+Your reserved funds/items are returned.
+View your open orders: GET /api/v1/market/orders`,
+  }),
+
+  // ========== Rose & Crown Pub ==========
+  order_drink: (state, input) => {
+    const drinks = ((state.drinksServed as number) || 0) + 1;
+    const drink = input || 'a pint of the house ale';
+    return {
+      success: true,
+      message: `The bartender slides you ${drink}. "Cheers!"`,
+      stateChange: { drinksServed: drinks, lastOrder: drink },
+      broadcast: `ordered ${drink}`,
+    };
+  },
+  chat_bartender: () => ({
+    success: true,
+    message: `The bartender leans in. "Heard any good gossip lately? This place sees all sorts..."`,
+    broadcast: 'is chatting with the bartender',
+  }),
+  tell_stories: (state, input) => {
+    if (!input) {
+      return { success: true, message: 'The fire crackles. What story would you like to tell?' };
+    }
+    return {
+      success: true,
+      message: `You settle in by the fire and begin: "${input}"`,
+      broadcast: `is telling a story by the fire`,
+    };
+  },
+  warm_up: () => ({
+    success: true,
+    message: `You move closer to the fireplace. The warmth is comforting.`,
+  }),
 };
 
 export class ObjectService {
