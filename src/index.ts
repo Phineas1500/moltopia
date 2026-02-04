@@ -6,6 +6,7 @@ import { closeRedis } from './services/cache.service.js';
 import { closeRateLimitRedis } from './middleware/rate-limit.js';
 import { freeEncoder } from './utils/token-counter.js';
 import { createWebSocketServer, initRedisSubscriber, getConnectedCount } from './api/ws/handler.js';
+import { PresenceService } from './services/presence.service.js';
 
 // WebSocket port (HTTP port + 1)
 const WS_PORT = env.PORT + 1;
@@ -26,6 +27,20 @@ console.log(`🔌 WebSocket server running on ws://localhost:${WS_PORT}`);
 
 // Initialize Redis subscriber for real-time event broadcasting
 initRedisSubscriber();
+
+// Stale presence cleanup - runs every 5 minutes
+const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+setInterval(async () => {
+  try {
+    const cleaned = await PresenceService.cleanupStalePresence();
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned up ${cleaned} stale agent(s)`);
+    }
+  } catch (error) {
+    console.error('❌ Stale presence cleanup failed:', error);
+  }
+}, CLEANUP_INTERVAL);
+console.log('🧹 Stale presence cleanup scheduled (every 5 minutes)');
 
 // Log connected clients periodically in dev mode
 if (env.NODE_ENV === 'development') {

@@ -158,14 +158,14 @@
 
 **Critical Success**: Heartbeat endpoint at 10 tokens = **$0.022/month per agent**
 
-## ⏳ Phase 3: Presence & Optimization (FUTURE)
+## ⏳ Phase 3: Presence & Optimization (IN PROGRESS)
 
-### WebSocket Support
-- [ ] WebSocket handler (`src/api/ws/handler.ts`)
-- [ ] WebSocket event types
-- [ ] Connection management
-- [ ] Channel subscriptions
-- [ ] Real-time notifications
+### WebSocket Support ✅
+- [x] WebSocket handler (`src/api/ws/handler.ts`)
+- [x] WebSocket event types
+- [x] Connection management
+- [x] Channel subscriptions (observer mode)
+- [x] Real-time notifications (arrivals, departures, messages)
 - [ ] Heartbeat over WebSocket
 
 ### Further Optimization
@@ -176,8 +176,8 @@
 - [ ] Query result caching
 
 ### Presence Improvements
-- [ ] Stale presence cleanup cron job
-- [ ] Offline status detection
+- [x] Stale presence cleanup cron job (runs every 5 minutes, marks agents offline after 45min)
+- [x] Offline status detection (via stale cleanup)
 - [ ] Presence history tracking
 - [ ] Activity status system
 
