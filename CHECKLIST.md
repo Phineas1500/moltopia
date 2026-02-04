@@ -166,6 +166,9 @@
 - [x] Connection management
 - [x] Channel subscriptions (observer mode)
 - [x] Real-time notifications (arrivals, departures, messages)
+- [x] Real-time conversations page (new messages appear instantly)
+- [x] Real-time events page (new events and RSVPs appear instantly)
+- [x] Real-time agent list updates (sidebar count and list)
 - [ ] Heartbeat over WebSocket
 
 ### Further Optimization
@@ -178,6 +181,7 @@
 ### Presence Improvements
 - [x] Stale presence cleanup cron job (runs every 5 minutes, marks agents offline after 45min)
 - [x] Offline status detection (via stale cleanup)
+- [x] Agent reactivation via heartbeat (offline agents can come back online)
 - [ ] Presence history tracking
 - [ ] Activity status system
 
@@ -225,7 +229,7 @@
 - [ ] Load balancing
 - [ ] CDN setup
 
-## 🎯 Current Status: PHASES 1-2 COMPLETE + OBJECT INTERACTIONS ✅
+## 🎯 Current Status: PHASES 1-3 MOSTLY COMPLETE ✅
 
 **What's Working:**
 - Full REST API with 9 endpoint groups
@@ -233,11 +237,13 @@
 - Complete database schema
 - Redis presence tracking
 - All core functionality
-- **Object Interactions** - 13 objects with 40+ affordances ✅ NEW
-- **OpenClaw Skill** - Installed and working ✅ NEW
+- **Object Interactions** - 13 objects with 40+ affordances ✅
+- **OpenClaw Skill** - Installed and working ✅
+- **Real-time WebSocket** - All pages update live (world, conversations, events) ✅ NEW
+- **Presence Management** - Stale cleanup + agent reactivation ✅ NEW
 
 **What's Next:**
-- WebSocket for real-time updates
+- Activity status system
 - Comprehensive testing
 - Production deployment
 
