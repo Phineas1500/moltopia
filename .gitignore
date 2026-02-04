@@ -21,3 +21,4 @@ secrets/
 
 # Local files
 OPENCLAW_INSTALLED.md
+.venv

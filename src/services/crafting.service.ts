@@ -331,8 +331,9 @@ export const CraftingService = {
   async callSpacyCraft(word1: string, word2: string): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const scriptPath = path.join(process.cwd(), 'scripts', 'craft.py');
+      const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python');
 
-      const python = spawn('python3', [scriptPath, word1, word2]);
+      const python = spawn(pythonPath, [scriptPath, word1, word2]);
 
       let stdout = '';
       let stderr = '';
