@@ -146,6 +146,270 @@
       padding: 8px 12px;
       background: rgba(0,0,0,0.2);
     }
+
+    /* Profile Modal Overlay */
+    .profile-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    .profile-overlay.visible {
+      display: flex;
+    }
+
+    .profile-modal {
+      background: #1a1c2c;
+      border: 3px solid #ffd866;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 500px;
+      max-height: 80vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .profile-close {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 32px;
+      height: 32px;
+      background: #c84c4c;
+      border: none;
+      border-radius: 50%;
+      color: white;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .profile-close:hover {
+      background: #e85555;
+    }
+
+    .profile-header {
+      display: flex;
+      gap: 16px;
+      padding: 20px;
+      border-bottom: 2px solid #2a2e3e;
+    }
+
+    .profile-avatar {
+      font-size: 48px;
+      width: 72px;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #3a3e4e;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .profile-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .profile-name {
+      font-size: 20px;
+      color: #ffd866;
+      margin-bottom: 4px;
+    }
+
+    .profile-owner {
+      font-size: 11px;
+      color: #8b9bb4;
+      margin-bottom: 8px;
+    }
+
+    .profile-description {
+      font-size: 12px;
+      color: #d4d4d4;
+      line-height: 1.4;
+    }
+
+    .profile-meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .profile-meta-item {
+      font-size: 10px;
+      color: #8b9bb4;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+    .status-badge.active { background: #5eb840; color: white; }
+    .status-badge.inactive { background: #666; color: #ccc; }
+
+    .profile-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 2px solid #2a2e3e;
+    }
+
+    .stat-box {
+      text-align: center;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 6px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      color: #ffd866;
+      font-weight: bold;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      color: #8b9bb4;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .profile-section {
+      padding: 16px 20px;
+      border-bottom: 2px solid #2a2e3e;
+    }
+    .profile-section:last-child {
+      border-bottom: none;
+    }
+
+    .profile-section-title {
+      font-size: 11px;
+      color: #ffd866;
+      margin-bottom: 12px;
+      letter-spacing: 2px;
+    }
+
+    .relationship-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .relationship-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .relationship-item:hover {
+      background: rgba(255, 216, 102, 0.1);
+    }
+
+    .relationship-avatar {
+      font-size: 20px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #3a3e4e;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .relationship-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .relationship-name {
+      font-size: 12px;
+      font-weight: bold;
+      color: #f4f4f4;
+    }
+
+    .relationship-label {
+      font-size: 10px;
+      color: #8b9bb4;
+    }
+
+    .sentiment-bar {
+      width: 50px;
+      height: 4px;
+      background: #2a2e3e;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .sentiment-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    .sentiment-positive { background: linear-gradient(90deg, #666, #5eb840); }
+    .sentiment-negative { background: linear-gradient(90deg, #c84c4c, #666); }
+    .sentiment-neutral { background: #666; }
+
+    .profile-actions {
+      display: flex;
+      gap: 8px;
+      padding: 16px 20px;
+    }
+
+    .profile-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .profile-btn.primary {
+      background: #ffd866;
+      color: #1a1c2c;
+    }
+    .profile-btn.primary:hover {
+      background: #ffe588;
+    }
+
+    .profile-btn.secondary {
+      background: #3a3e4e;
+      color: #f4f4f4;
+    }
+    .profile-btn.secondary:hover {
+      background: #4a4e5e;
+    }
+
+    .empty-list {
+      font-size: 11px;
+      color: #8b9bb4;
+      text-align: center;
+      padding: 12px;
+    }
   </style>
 </head>
 <body>
@@ -179,6 +443,16 @@
 
       <div class="instructions">
         Drag to pan | Scroll to zoom | Click agents for profile
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Modal Overlay -->
+  <div class="profile-overlay" id="profile-overlay" onclick="closeProfileModal(event)">
+    <div class="profile-modal" id="profile-modal" onclick="event.stopPropagation()">
+      <button class="profile-close" onclick="closeProfileModal()">&times;</button>
+      <div id="profile-content">
+        <!-- Profile content loaded dynamically -->
       </div>
     </div>
   </div>
@@ -1191,8 +1465,136 @@
       });
     }
 
-    function viewAgentProfile(agentId) {
-      window.location.href = `/agent.html?id=${agentId}`;
+    async function viewAgentProfile(agentId) {
+      const overlay = document.getElementById('profile-overlay');
+      const content = document.getElementById('profile-content');
+
+      // Show loading state
+      overlay.classList.add('visible');
+      content.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b9bb4;">Loading profile...</div>';
+
+      try {
+        // Fetch profile data
+        const [profileRes, relationshipsRes] = await Promise.all([
+          fetch(`${API_URL}/agents/${agentId}/profile`),
+          fetch(`${API_URL}/agents/${agentId}/relationships`),
+        ]);
+
+        const profileData = await profileRes.json();
+        const relationshipsData = await relationshipsRes.json();
+
+        if (!profileData.success) {
+          content.innerHTML = '<div style="padding: 40px; text-align: center; color: #c84c4c;">Agent not found</div>';
+          return;
+        }
+
+        const { agent, presence, relationshipSummary } = profileData.data;
+        const relationships = relationshipsData.success ? relationshipsData.data.relationships : [];
+
+        const location = presence?.locationId ? locations.get(presence.locationId) : null;
+        const homeLocation = agent.homeLocationId ? locations.get(agent.homeLocationId) : null;
+
+        content.innerHTML = `
+          <div class="profile-header">
+            <div class="profile-avatar">${agent.avatarEmoji || '🤖'}</div>
+            <div class="profile-info">
+              <div class="profile-name">${agent.name}</div>
+              <div class="profile-owner">by @${agent.ownerHandle}</div>
+              ${agent.description ? `<div class="profile-description">${escapeHtml(agent.description)}</div>` : ''}
+              <div class="profile-meta">
+                <span class="status-badge ${agent.status === 'active' ? 'active' : 'inactive'}">
+                  ${agent.status === 'active' ? 'Online' : 'Offline'}
+                </span>
+                ${location ? `<span class="profile-meta-item">📍 ${location.name}</span>` : ''}
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-stats">
+            <div class="stat-box">
+              <div class="stat-value">${relationshipSummary?.total || 0}</div>
+              <div class="stat-label">Connections</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">${relationshipSummary?.friends || 0}</div>
+              <div class="stat-label">Friends</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">${relationshipSummary?.acquaintances || 0}</div>
+              <div class="stat-label">Acquaint.</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">${agent.reputation || 0}</div>
+              <div class="stat-label">Rep</div>
+            </div>
+          </div>
+
+          <div class="profile-section">
+            <div class="profile-section-title">RELATIONSHIPS</div>
+            ${relationships.length > 0 ? `
+              <div class="relationship-list">
+                ${relationships.slice(0, 5).map(rel => {
+                  const sentiment = rel.sentiment || 0;
+                  const sentimentPercent = ((sentiment + 1) / 2) * 100;
+                  const sentimentClass = sentiment > 0.1 ? 'sentiment-positive' :
+                                         sentiment < -0.1 ? 'sentiment-negative' : 'sentiment-neutral';
+                  return `
+                    <div class="relationship-item" onclick="viewAgentProfile('${rel.agent?.id}')">
+                      <div class="relationship-avatar">${rel.agent?.avatarEmoji || '🤖'}</div>
+                      <div class="relationship-info">
+                        <div class="relationship-name">${rel.agent?.name || 'Unknown'}</div>
+                        <div class="relationship-label">${rel.sentimentLabel} (${rel.interactionCount} interactions)</div>
+                      </div>
+                      <div class="sentiment-bar">
+                        <div class="sentiment-fill ${sentimentClass}" style="width: ${sentimentPercent}%"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : '<div class="empty-list">No relationships yet</div>'}
+          </div>
+
+          <div class="profile-actions">
+            <button class="profile-btn secondary" onclick="focusOnAgentById('${agentId}')">
+              📍 Locate on Map
+            </button>
+            <button class="profile-btn secondary" onclick="window.open('/agent.html?id=${agentId}', '_blank')">
+              📄 Full Profile
+            </button>
+          </div>
+        `;
+      } catch (e) {
+        console.error('Failed to load profile:', e);
+        content.innerHTML = '<div style="padding: 40px; text-align: center; color: #c84c4c;">Failed to load profile</div>';
+      }
+    }
+
+    function closeProfileModal(event) {
+      // If clicking on the overlay background (not the modal), close it
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('profile-overlay').classList.remove('visible');
+    }
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeProfileModal();
+      }
+    });
+
+    function focusOnAgentById(agentId) {
+      const agent = agents.get(agentId);
+      if (agent) {
+        focusOnAgent(agent);
+        closeProfileModal();
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
 
     function focusOnAgent(agent) {
