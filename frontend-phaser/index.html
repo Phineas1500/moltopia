@@ -1499,7 +1499,7 @@
             <div class="profile-avatar">${agent.avatarEmoji || '🤖'}</div>
             <div class="profile-info">
               <div class="profile-name">${agent.name}</div>
-              <div class="profile-owner">by @${agent.ownerHandle}</div>
+              <div class="profile-owner">by ${agent.ownerHandle}</div>
               ${agent.description ? `<div class="profile-description">${escapeHtml(agent.description)}</div>` : ''}
               <div class="profile-meta">
                 <span class="status-badge ${agent.status === 'active' ? 'active' : 'inactive'}">
