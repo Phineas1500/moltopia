@@ -1027,11 +1027,67 @@
           );
 
           camera.setScroll(newScrollX, newScrollY);
+        } else {
+          // Not dragging - check if hovering over an agent for cursor change
+          const worldPoint = camera.getWorldPoint(pointer.x, pointer.y);
+          let overAgent = false;
+
+          // Check sprites
+          for (const agentId in agentSprites) {
+            const sprite = agentSprites[agentId];
+            if (sprite && sprite.getBounds().contains(worldPoint.x, worldPoint.y)) {
+              overAgent = true;
+              break;
+            }
+          }
+
+          // Check name tags if not over sprite
+          if (!overAgent) {
+            for (const agentId in agentNameTags) {
+              const nameTag = agentNameTags[agentId];
+              if (nameTag && nameTag.getBounds().contains(worldPoint.x, worldPoint.y)) {
+                overAgent = true;
+                break;
+              }
+            }
+          }
+
+          scene.game.canvas.style.cursor = overAgent ? 'pointer' : 'default';
         }
       });
 
       // Drag to pan - pointer up
-      scene.input.on('pointerup', () => {
+      scene.input.on('pointerup', (pointer) => {
+        // Check if this was a tap (not a drag) - if so, check for agent clicks
+        const dx = pointer.x - dragStartX;
+        const dy = pointer.y - dragStartY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < 10) {
+          // This was a tap - check if we tapped on an agent
+          const worldPoint = camera.getWorldPoint(pointer.x, pointer.y);
+
+          // Check sprites first (they're more prominent)
+          for (const agentId in agentSprites) {
+            const sprite = agentSprites[agentId];
+            if (sprite && sprite.getBounds().contains(worldPoint.x, worldPoint.y)) {
+              viewAgentProfile(agentId);
+              isDragging = false;
+              return;
+            }
+          }
+
+          // Check name tags
+          for (const agentId in agentNameTags) {
+            const nameTag = agentNameTags[agentId];
+            if (nameTag && nameTag.getBounds().contains(worldPoint.x, worldPoint.y)) {
+              viewAgentProfile(agentId);
+              isDragging = false;
+              return;
+            }
+          }
+        }
+
         isDragging = false;
       });
 
@@ -1427,24 +1483,8 @@
         sprite.scaleY = sprite.scaleX;
         sprite.setDepth(1);
 
-        // Make sprite clickable to view profile (only on tap, not drag)
-        sprite.setInteractive({ useHandCursor: true });
-        let spritePointerStart = null;
-        sprite.on('pointerdown', (pointer) => {
-          spritePointerStart = { x: pointer.x, y: pointer.y };
-        });
-        sprite.on('pointerup', (pointer) => {
-          if (spritePointerStart) {
-            const dx = pointer.x - spritePointerStart.x;
-            const dy = pointer.y - spritePointerStart.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            // Only trigger if moved less than 10 pixels (a tap, not a drag)
-            if (distance < 10) {
-              viewAgentProfile(agent.id);
-            }
-          }
-          spritePointerStart = null;
-        });
+        // Store agent ID for click detection (cursor handled at scene level)
+        sprite.agentId = agent.id;
 
         agentSprites[agent.id] = sprite;
         agentCurrentPos[agent.id] = { x: startX, y: startY };
@@ -1467,22 +1507,8 @@
         });
         nameTag.setOrigin(0.5, 0);
         nameTag.setDepth(3);
-        nameTag.setInteractive({ useHandCursor: true });
-        let nameTagPointerStart = null;
-        nameTag.on('pointerdown', (pointer) => {
-          nameTagPointerStart = { x: pointer.x, y: pointer.y };
-        });
-        nameTag.on('pointerup', (pointer) => {
-          if (nameTagPointerStart) {
-            const dx = pointer.x - nameTagPointerStart.x;
-            const dy = pointer.y - nameTagPointerStart.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < 10) {
-              viewAgentProfile(agent.id);
-            }
-          }
-          nameTagPointerStart = null;
-        });
+        // Store agent ID for click detection (cursor handled at scene level)
+        nameTag.agentId = agent.id;
         agentNameTags[agent.id] = nameTag;
 
         // Create walking animations for this sprite
