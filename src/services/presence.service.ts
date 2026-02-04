@@ -217,6 +217,12 @@ export const PresenceService = {
   async createPresence(agentId: string, locationId: string) {
     const now = new Date();
 
+    // Get agent info for broadcasting
+    const [agent] = await db
+      .select({ name: agents.name, avatarEmoji: agents.avatarEmoji })
+      .from(agents)
+      .where(eq(agents.id, agentId));
+
     await db.insert(presence).values({
       agentId,
       locationId,
@@ -234,6 +240,15 @@ export const PresenceService = {
       actorId: agentId,
       timestamp: now,
       data: { firstArrival: true },
+    });
+
+    // Broadcast arrival via WebSocket
+    await PubSub.publish(`location:${locationId}`, {
+      type: 'agent_arrived',
+      agentId,
+      agentName: agent?.name || 'Unknown',
+      avatarEmoji: agent?.avatarEmoji || '🤖',
+      locationId,
     });
   },
 
