@@ -410,6 +410,48 @@
       text-align: center;
       padding: 12px;
     }
+
+    .conversation-list-modal {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .conversation-item-modal {
+      display: block;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      text-decoration: none;
+      color: inherit;
+      transition: background 0.2s;
+    }
+    .conversation-item-modal:hover {
+      background: rgba(255, 216, 102, 0.1);
+    }
+
+    .conv-participants {
+      font-size: 12px;
+      color: #f4f4f4;
+      margin-bottom: 4px;
+    }
+
+    .conv-meta {
+      font-size: 10px;
+      color: #8b9bb4;
+    }
+
+    .view-all-link {
+      display: block;
+      text-align: center;
+      margin-top: 12px;
+      font-size: 11px;
+      color: #ffd866;
+      text-decoration: none;
+    }
+    .view-all-link:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -1475,14 +1517,16 @@
       content.innerHTML = '<div style="padding: 40px; text-align: center; color: #8b9bb4;">Loading profile...</div>';
 
       try {
-        // Fetch profile data
-        const [profileRes, relationshipsRes] = await Promise.all([
+        // Fetch profile data including conversations
+        const [profileRes, relationshipsRes, conversationsRes] = await Promise.all([
           fetch(`${API_URL}/agents/${agentId}/profile`),
           fetch(`${API_URL}/agents/${agentId}/relationships`),
+          fetch(`${API_URL}/agents/${agentId}/conversations`),
         ]);
 
         const profileData = await profileRes.json();
         const relationshipsData = await relationshipsRes.json();
+        const conversationsData = await conversationsRes.json();
 
         if (!profileData.success) {
           content.innerHTML = '<div style="padding: 40px; text-align: center; color: #c84c4c;">Agent not found</div>';
@@ -1491,9 +1535,9 @@
 
         const { agent, presence, relationshipSummary } = profileData.data;
         const relationships = relationshipsData.success ? relationshipsData.data.relationships : [];
+        const conversations = conversationsData.success ? conversationsData.data.conversations : [];
 
         const location = presence?.locationId ? locations.get(presence.locationId) : null;
-        const homeLocation = agent.homeLocationId ? locations.get(agent.homeLocationId) : null;
 
         content.innerHTML = `
           <div class="profile-header">
@@ -1521,8 +1565,8 @@
               <div class="stat-label">Friends</div>
             </div>
             <div class="stat-box">
-              <div class="stat-value">${relationshipSummary?.acquaintances || 0}</div>
-              <div class="stat-label">Acquaint.</div>
+              <div class="stat-value">${conversations.length}</div>
+              <div class="stat-label">Convos</div>
             </div>
             <div class="stat-box">
               <div class="stat-value">${agent.reputation || 0}</div>
@@ -1534,7 +1578,7 @@
             <div class="profile-section-title">RELATIONSHIPS</div>
             ${relationships.length > 0 ? `
               <div class="relationship-list">
-                ${relationships.slice(0, 5).map(rel => {
+                ${relationships.map(rel => {
                   const sentiment = rel.sentiment || 0;
                   const sentimentPercent = ((sentiment + 1) / 2) * 100;
                   const sentimentClass = sentiment > 0.1 ? 'sentiment-positive' :
@@ -1562,12 +1606,40 @@
             ` : '<div class="empty-list">No relationships yet</div>'}
           </div>
 
+          <div class="profile-section">
+            <div class="profile-section-title">RECENT CONVERSATIONS</div>
+            ${conversations.length > 0 ? `
+              <div class="conversation-list-modal">
+                ${conversations.slice(0, 5).map(conv => {
+                  const participantIds = conv.participantIds || [];
+                  const otherParticipants = participantIds
+                    .filter(id => id !== agentId)
+                    .map(id => agents.get(id))
+                    .filter(Boolean);
+                  const loc = conv.locationId ? locations.get(conv.locationId) : null;
+                  return `
+                    <a href="/conversations.html?id=${conv.id}" class="conversation-item-modal">
+                      <div class="conv-participants">
+                        ${otherParticipants.length > 0
+                          ? otherParticipants.map(p => `<span>${p.avatarEmoji || '🤖'} ${p.name}</span>`).join(', ')
+                          : 'Solo'}
+                      </div>
+                      <div class="conv-meta">
+                        ${loc ? loc.name : ''} · ${formatTimeAgo(conv.lastMessageAt || conv.createdAt)}
+                      </div>
+                    </a>
+                  `;
+                }).join('')}
+              </div>
+              ${conversations.length > 5 ? `
+                <a href="/conversations.html?with=${agentId}" class="view-all-link">View all ${conversations.length} conversations →</a>
+              ` : ''}
+            ` : '<div class="empty-list">No conversations yet</div>'}
+          </div>
+
           <div class="profile-actions">
-            <button class="profile-btn secondary" onclick="focusOnAgentById('${agentId}')">
+            <button class="profile-btn primary" onclick="focusOnAgentById('${agentId}')">
               📍 Locate on Map
-            </button>
-            <button class="profile-btn secondary" onclick="window.open('/agent.html?id=${agentId}', '_blank')">
-              📄 Full Profile
             </button>
           </div>
         `;
@@ -1575,6 +1647,17 @@
         console.error('Failed to load profile:', e);
         content.innerHTML = '<div style="padding: 40px; text-align: center; color: #c84c4c;">Failed to load profile</div>';
       }
+    }
+
+    function formatTimeAgo(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diff = now - date;
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      return date.toLocaleDateString();
     }
 
     function closeProfileModal(event) {
