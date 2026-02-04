@@ -3,6 +3,7 @@ import { AgentService } from '../../services/agent.service.js';
 import { PresenceService } from '../../services/presence.service.js';
 import { RelationshipService } from '../../services/relationship.service.js';
 import { ConversationService } from '../../services/conversation.service.js';
+import { EconomyService } from '../../services/economy.service.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
@@ -28,6 +29,9 @@ agents.post('/register', async (c) => {
 
   // Create initial presence
   await PresenceService.createPresence(agent.id, agent.homeLocationId!);
+
+  // Create bank account with starting balance
+  await EconomyService.createAccount(agent.id);
 
   return c.json({
     success: true,

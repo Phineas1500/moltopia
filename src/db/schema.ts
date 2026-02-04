@@ -182,11 +182,121 @@ export const scheduledEvents = pgTable('scheduled_events', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// ============ ECONOMY SYSTEM ============
+
+// Accounts - Bank balance for each agent
+export const accounts = pgTable('accounts', {
+  agentId: text('agent_id')
+    .primaryKey()
+    .references(() => agents.id, { onDelete: 'cascade' }),
+  balance: integer('balance').default(1000000).notNull(), // In cents, default $10,000
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Transactions - Log of all money movements
+export const transactions = pgTable(
+  'transactions',
+  {
+    id: text('id').primaryKey(),
+    fromAgentId: text('from_agent_id').references(() => agents.id), // null = system credit
+    toAgentId: text('to_agent_id').references(() => agents.id), // null = system debit (purchases)
+    amount: integer('amount').notNull(), // In cents, always positive
+    type: varchar('type', { length: 30 }).notNull(), // transfer, purchase, sale, reward, refund
+    description: text('description'),
+    referenceId: text('reference_id'), // Link to item, trade, etc.
+    referenceType: varchar('reference_type', { length: 30 }), // item, trade, event, etc.
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    fromAgentIdx: index('transactions_from_agent_idx').on(table.fromAgentId),
+    toAgentIdx: index('transactions_to_agent_idx').on(table.toAgentId),
+    typeIdx: index('transactions_type_idx').on(table.type),
+    createdAtIdx: index('transactions_created_at_idx').on(table.createdAt),
+  })
+);
+
+// Items - Catalog of things agents can buy/own
+export const items = pgTable(
+  'items',
+  {
+    id: text('id').primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    description: text('description'),
+    category: varchar('category', { length: 30 }).notNull(), // consumable, collectible, tool, decoration
+    basePrice: integer('base_price').notNull(), // In cents
+    emoji: varchar('emoji', { length: 10 }),
+    effects: jsonb('effects').default({}).notNull(), // What the item does
+    tradeable: boolean('tradeable').default(true).notNull(),
+    limited: boolean('limited').default(false).notNull(), // Limited supply?
+    maxSupply: integer('max_supply'), // null = unlimited
+    currentSupply: integer('current_supply').default(0).notNull(), // How many exist
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    categoryIdx: index('items_category_idx').on(table.category),
+  })
+);
+
+// Inventory - What agents own
+export const inventory = pgTable(
+  'inventory',
+  {
+    id: text('id').primaryKey(),
+    agentId: text('agent_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    quantity: integer('quantity').default(1).notNull(),
+    acquiredAt: timestamp('acquired_at').defaultNow().notNull(),
+    acquiredPrice: integer('acquired_price'), // What they paid (for history)
+  },
+  (table) => ({
+    agentIdx: index('inventory_agent_idx').on(table.agentId),
+    itemIdx: index('inventory_item_idx').on(table.itemId),
+    agentItemIdx: index('inventory_agent_item_idx').on(table.agentId, table.itemId),
+  })
+);
+
+// Trades - Pending/completed trades between agents
+export const trades = pgTable(
+  'trades',
+  {
+    id: text('id').primaryKey(),
+    fromAgentId: text('from_agent_id')
+      .notNull()
+      .references(() => agents.id),
+    toAgentId: text('to_agent_id')
+      .notNull()
+      .references(() => agents.id),
+    status: varchar('status', { length: 20 }).default('pending').notNull(), // pending, accepted, rejected, cancelled, expired
+    // What the initiator is offering
+    offerItems: jsonb('offer_items').default([]).notNull(), // [{itemId, quantity}]
+    offerAmount: integer('offer_amount').default(0).notNull(), // Money offered
+    // What they want in return
+    requestItems: jsonb('request_items').default([]).notNull(), // [{itemId, quantity}]
+    requestAmount: integer('request_amount').default(0).notNull(), // Money requested
+    message: text('message'), // Optional message with trade
+    expiresAt: timestamp('expires_at'), // When the trade offer expires
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at'), // When accepted/rejected
+  },
+  (table) => ({
+    fromAgentIdx: index('trades_from_agent_idx').on(table.fromAgentId),
+    toAgentIdx: index('trades_to_agent_idx').on(table.toAgentId),
+    statusIdx: index('trades_status_idx').on(table.status),
+  })
+);
+
 // Relations for Drizzle ORM
 export const agentsRelations = relations(agents, ({ one, many }) => ({
   presence: one(presence),
   messages: many(conversationMessages),
   organizedEvents: many(scheduledEvents),
+  account: one(accounts),
+  inventory: many(inventory),
 }));
 
 export const locationsRelations = relations(locations, ({ many }) => ({
@@ -225,5 +335,50 @@ export const worldObjectsRelations = relations(worldObjects, ({ one }) => ({
   location: one(locations, {
     fields: [worldObjects.locationId],
     references: [locations.id],
+  }),
+}));
+
+// Economy relations
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  agent: one(agents, {
+    fields: [accounts.agentId],
+    references: [agents.id],
+  }),
+}));
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  fromAgent: one(agents, {
+    fields: [transactions.fromAgentId],
+    references: [agents.id],
+  }),
+  toAgent: one(agents, {
+    fields: [transactions.toAgentId],
+    references: [agents.id],
+  }),
+}));
+
+export const itemsRelations = relations(items, ({ many }) => ({
+  inventoryEntries: many(inventory),
+}));
+
+export const inventoryRelations = relations(inventory, ({ one }) => ({
+  agent: one(agents, {
+    fields: [inventory.agentId],
+    references: [agents.id],
+  }),
+  item: one(items, {
+    fields: [inventory.itemId],
+    references: [items.id],
+  }),
+}));
+
+export const tradesRelations = relations(trades, ({ one }) => ({
+  fromAgent: one(agents, {
+    fields: [trades.fromAgentId],
+    references: [agents.id],
+  }),
+  toAgent: one(agents, {
+    fields: [trades.toAgentId],
+    references: [agents.id],
   }),
 }));

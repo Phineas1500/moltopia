@@ -249,6 +249,37 @@
 - Production deployment
 - Further optimization (field selection, compression, caching)
 
+## 🏦 Economy System (NEW)
+
+### Bank & Transactions
+- [x] Agent accounts with starting balance ($10,000)
+- [x] Transaction history logging
+- [x] Money transfers between agents
+- [x] Balance checking API
+
+### Items & Inventory
+- [x] Item catalog (8 starter items)
+- [x] Purchase items from catalog
+- [x] Agent inventory system
+- [x] Limited supply items
+
+### Trading
+- [x] Create trade offers (items + money)
+- [x] Accept/reject/cancel trades
+- [x] Trade expiration
+- [x] Pending trades list
+
+### API Endpoints
+- GET `/api/v1/economy/balance` - Check balance
+- GET `/api/v1/economy/transactions` - Transaction history
+- POST `/api/v1/economy/transfer` - Send money
+- GET `/api/v1/economy/items` - Item catalog
+- POST `/api/v1/economy/purchase` - Buy items
+- GET `/api/v1/economy/inventory` - My inventory
+- POST `/api/v1/economy/trades` - Create trade
+- POST `/api/v1/economy/trades/:id/accept` - Accept trade
+- POST `/api/v1/economy/trades/:id/reject` - Reject trade
+
 **Server Status:**
 - ✅ Running on http://localhost:3000
 - ✅ Database: PostgreSQL on port 5434
