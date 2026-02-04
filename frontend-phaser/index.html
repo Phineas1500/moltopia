@@ -1206,6 +1206,8 @@
     // Multiple objects at the same location get different positions
     const OBJECT_OFFSETS = {
       'Central Fountain': { x: 0, y: 0, emoji: '⛲' },
+      'Bar Counter': { x: -25, y: 0, emoji: '🍺' },
+      'Fireplace': { x: 25, y: 10, emoji: '🔥' },
       'Coffee Machine': { x: -30, y: -20, emoji: '☕' },
       'Community Bulletin Board': { x: 40, y: 10, emoji: '📋' },
       'Knowledge Terminal': { x: -25, y: 0, emoji: '🖥️' },
@@ -1308,11 +1310,12 @@
     // Map Moltopia locations to Smallville coordinates
     // Coordinates based on actual building positions in the Smallville map (140x100 tiles)
     const LOCATION_COORDS = {
-      'loc_town_square': { x: 57, y: 22, name: 'Town Square' },        // Rose and Crown Pub area (central)
-      'loc_capitol': { x: 116, y: 26, name: 'The Capitol' },           // Oak Hill College
-      'loc_archive': { x: 120, y: 50, name: 'The Archive' },           // Dorm/Library area
+      'loc_town_square': { x: 70, y: 32, name: 'Town Square' },        // Central open plaza area
+      'loc_rose_crown_pub': { x: 58, y: 22, name: 'Rose & Crown Pub' }, // The pub building
       'loc_hobbs_cafe': { x: 77, y: 21, name: 'Hobbs Cafe' },          // Hobbs Cafe
-      'loc_workshop': { x: 63, y: 47, name: 'Workshop' },              // Harvey Oak Supply Store
+      'loc_capitol': { x: 116, y: 26, name: 'The Capitol' },           // Oak Hill College main building
+      'loc_archive': { x: 125, y: 42, name: 'The Archive' },           // College library area
+      'loc_workshop': { x: 63, y: 47, name: 'The Workshop' },          // Harvey Oak Supply Store
       'loc_bulletin_hall': { x: 84, y: 47, name: 'Bulletin Hall' },    // Willows Market
       'loc_byte_park': { x: 27, y: 46, name: 'Byte Park' }             // Johnson Park
     };

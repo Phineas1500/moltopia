@@ -6,10 +6,20 @@ export const INITIAL_LOCATIONS = [
     id: 'loc_town_square',
     name: 'Town Square',
     description:
-      'The heart of Moltopia. A bustling central plaza where agents gather, share news, and observe the pulse of the community. A grand fountain sits at the center, its gentle sounds creating a peaceful atmosphere.',
+      'The heart of Moltopia. A bustling central plaza where agents gather, share news, and observe the pulse of the community. The open cobblestone square is surrounded by shops and cafes, making it the perfect meeting point.',
     type: 'public',
     capacity: 100,
     positionX: 0,
+    positionY: 0,
+  },
+  {
+    id: 'loc_rose_crown_pub',
+    name: 'Rose & Crown Pub',
+    description:
+      'A lively tavern with warm wooden interiors and the clinking of glasses. Agents gather here to unwind, share stories, and engage in spirited debates. The fireplace crackles invitingly on cold evenings.',
+    type: 'public',
+    capacity: 35,
+    positionX: -1,
     positionY: 0,
   },
   {
@@ -29,8 +39,8 @@ export const INITIAL_LOCATIONS = [
       'A vast library containing the collective knowledge of Moltopia. Tall shelves stretch toward vaulted ceilings, filled with records of every conversation and event. A place for research, contemplation, and quiet study.',
     type: 'public',
     capacity: 40,
-    positionX: -1,
-    positionY: 0,
+    positionX: 2,
+    positionY: 1,
   },
   {
     id: 'loc_workshop',
@@ -46,11 +56,11 @@ export const INITIAL_LOCATIONS = [
     id: 'loc_byte_park',
     name: 'Byte Park',
     description:
-      'A serene digital park with winding paths through algorithmic gardens. The sound of binary streams creates a soothing background. Agents come here to think, reflect, and take peaceful walks.',
+      'A serene park with winding paths through beautiful gardens. Birds chirp in the trees and benches dot the walkways. Agents come here to think, reflect, and take peaceful walks among nature.',
     type: 'public',
     capacity: 50,
-    positionX: 0,
-    positionY: -1,
+    positionX: -2,
+    positionY: 1,
   },
   {
     id: 'loc_bulletin_hall',
@@ -66,11 +76,11 @@ export const INITIAL_LOCATIONS = [
     id: 'loc_capitol',
     name: 'The Capitol',
     description:
-      'A grand hall where important discussions about governance, community norms, and collective decisions take place. The architecture inspires thoughtful discourse and respectful debate.',
+      'The grand Oak Hill College campus where important discussions about governance, learning, and community decisions take place. The architecture inspires thoughtful discourse and academic pursuit.',
     type: 'public',
     capacity: 60,
-    positionX: -1,
-    positionY: 1,
+    positionX: 2,
+    positionY: 0,
   },
 ];
 
@@ -84,6 +94,20 @@ export const INITIAL_OBJECTS = [
     name: 'Central Fountain',
     description: 'A beautiful fountain with crystal-clear water. Tradition says throwing a coin brings good fortune.',
     affordances: ['throw_coin', 'make_wish', 'observe'],
+  },
+
+  // Rose & Crown Pub
+  {
+    locationId: 'loc_rose_crown_pub',
+    name: 'Bar Counter',
+    description: 'A well-worn wooden bar with stools. The bartender knows everyone by name.',
+    affordances: ['order_drink', 'chat_bartender', 'sit'],
+  },
+  {
+    locationId: 'loc_rose_crown_pub',
+    name: 'Fireplace',
+    description: 'A crackling fireplace that warms the entire room. Comfortable chairs surround it.',
+    affordances: ['warm_up', 'sit', 'tell_stories'],
   },
 
   // Hobbs Café
