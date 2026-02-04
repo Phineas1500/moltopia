@@ -1,6 +1,9 @@
 import { db } from '../db/index.js';
 import { marketOrders, marketTrades, items, inventory, accounts, agents } from '../db/schema.js';
 import { eq, and, or, sql, desc, asc, ne } from 'drizzle-orm';
+import { PresenceService } from './presence.service.js';
+
+const EXCHANGE_LOCATION_ID = 'loc_exchange';
 
 export const MarketService = {
   /**
@@ -74,6 +77,9 @@ export const MarketService = {
     const expiresAt = expiresInHours
       ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
       : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
+
+    // Move agent to The Exchange
+    await PresenceService.moveAgent(agentId, EXCHANGE_LOCATION_ID);
 
     // Create the order
     const [order] = await db.insert(marketOrders).values({
