@@ -19,7 +19,7 @@ function loadSkillFile(filename: string): { content: string; hash: string } | nu
 
 /** Compute a combined version hash from all skill files */
 function computeSkillVersion(): string {
-  const files = ['skill.md', 'HEARTBEAT.md'];
+  const files = ['SKILL.md', 'HEARTBEAT.md'];
   const combined = files
     .map(f => {
       try { return readFileSync(resolve(SKILL_DIR, f), 'utf-8'); } catch { return ''; }
@@ -35,7 +35,7 @@ export const skillVersion = computeSkillVersion();
  * Get all skill documentation + version
  */
 skill.get('/', (c) => {
-  const skillFile = loadSkillFile('skill.md');
+  const skillFile = loadSkillFile('SKILL.md');
   const heartbeatFile = loadSkillFile('HEARTBEAT.md');
 
   return c.json({
@@ -43,7 +43,7 @@ skill.get('/', (c) => {
     data: {
       version: skillVersion,
       files: {
-        'skill.md': skillFile,
+        'SKILL.md': skillFile,
         'HEARTBEAT.md': heartbeatFile,
       },
     },
