@@ -987,7 +987,7 @@
                   <div class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</div>
                   <div>
                     <div class="portfolio-name">${agent.name}</div>
-                    <div class="portfolio-balance">${agent.ownerHandle}</div>
+                    <div class="portfolio-balance">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</div>
                   </div>
                 </div>
                 <div class="portfolio-items">
@@ -1012,7 +1012,7 @@
                   <div class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</div>
                   <div>
                     <div class="portfolio-name">${agent.name}</div>
-                    <div class="portfolio-balance">${agent.ownerHandle}</div>
+                    <div class="portfolio-balance">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</div>
                   </div>
                 </div>
                 <div class="portfolio-items">

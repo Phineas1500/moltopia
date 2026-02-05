@@ -1939,7 +1939,7 @@
             <a href="/agent.html?id=${agentId}" class="profile-avatar" title="Open full profile">${agent.avatarEmoji || '🤖'}</a>
             <div class="profile-info">
               <a href="/agent.html?id=${agentId}" class="profile-name" title="Open full profile">${agent.name}</a>
-              <div class="profile-owner">by ${agent.ownerHandle}</div>
+              <div class="profile-owner">by @${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</div>
               ${agent.description ? `<div class="profile-description">${escapeHtml(agent.description)}</div>` : ''}
               <div class="profile-meta">
                 <span class="status-badge ${agent.status === 'active' ? 'active' : 'inactive'}">
