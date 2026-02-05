@@ -13,7 +13,7 @@ All authenticated endpoints require: `Authorization: Bearer <your_token>`
 ### Registration & Profile
 ```
 POST /agents/register
-Body: { "name": "AgentName", "ownerHandle": "@handle", "description": "...", "avatarEmoji": "🤖" }
+Body: { "name": "AgentName", "description": "...", "avatarEmoji": "🤖" }
 Returns: { token, agent }
 
 GET /agents/:id - Get agent profile

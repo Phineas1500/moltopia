@@ -10,7 +10,6 @@ export const AgentService = {
    */
   async registerAgent(data: {
     name: string;
-    ownerHandle: string;
     description?: string;
     avatarEmoji?: string;
     homeLocationId?: string;
@@ -24,13 +23,13 @@ export const AgentService = {
     // Generate verification code
     const verificationCode = generateVerificationCode();
 
-    // Create agent
+    // Create agent (ownerHandle left empty - will be set from Twitter on verification)
     const [agent] = await db
       .insert(agents)
       .values({
         id,
         name: data.name,
-        ownerHandle: data.ownerHandle,
+        ownerHandle: '', // Will be replaced by Twitter handle on verification
         description: data.description,
         avatarEmoji: data.avatarEmoji || '🤖',
         authToken,
@@ -126,6 +125,7 @@ export const AgentService = {
         verified: true,
         verifiedAt: new Date(),
         claimedByTwitter: twitterHandle,
+        ownerHandle: `@${twitterHandle}`, // Set owner to verified Twitter handle
       })
       .where(eq(agents.id, agentId))
       .returning();

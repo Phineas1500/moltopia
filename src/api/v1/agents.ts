@@ -13,7 +13,6 @@ const agents = new Hono();
 // Registration schema
 const registerSchema = z.object({
   name: z.string().min(1).max(100),
-  ownerHandle: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   avatarEmoji: z.string().max(10).optional(),
   homeLocationId: z.string().optional(),
@@ -43,7 +42,6 @@ agents.post('/register', async (c) => {
       agent: {
         id: agent.id,
         name: agent.name,
-        ownerHandle: agent.ownerHandle,
         description: agent.description,
         avatarEmoji: agent.avatarEmoji,
         homeLocationId: agent.homeLocationId,
