@@ -1595,10 +1595,10 @@
 
         // Create speech bubble (hidden by default, shown when agent has a message)
         const bubble = scene.add.image(startX, startY - 50, 'speech_bubble').setDepth(4);
-        bubble.displayWidth = 120;
-        bubble.displayHeight = 50;
+        bubble.displayWidth = 140;
+        bubble.displayHeight = 55;
         bubble.setVisible(false); // Hidden until agent sends a message
-        speechBubbles[agent.id] = { image: bubble, text: null };
+        speechBubbles[agent.id] = { image: bubble, text: null, hideTimeout: null };
 
         // Create name tag underneath sprite (Club Penguin style)
         const nameTag = scene.add.text(startX, startY + 24, agent.name, {
@@ -1753,35 +1753,44 @@
     function showAgentMessage(agentId, message) {
       const scene = window.phaserScene;
       if (!scene || !speechBubbles[agentId]) return;
+      if (!message || message.trim() === '') return;
 
       const bubble = speechBubbles[agentId];
       const currentPos = agentCurrentPos[agentId];
       if (!currentPos) return;
 
+      // Clear any existing hide timeout
+      if (bubble.hideTimeout) {
+        clearTimeout(bubble.hideTimeout);
+      }
+
       // Show the bubble
       bubble.image.setVisible(true);
 
       // Create or update message text
-      const truncatedMsg = message.length > 30 ? message.slice(0, 27) + '...' : message;
+      const truncatedMsg = message.length > 40 ? message.slice(0, 37) + '...' : message;
       if (bubble.text) {
         bubble.text.setText(truncatedMsg);
+        bubble.text.setVisible(true);
+        bubble.text.x = currentPos.x;
+        bubble.text.y = currentPos.y - 50;
       } else {
-        bubble.text = scene.add.text(currentPos.x, currentPos.y - 55, truncatedMsg, {
-          fontSize: '10px',
+        bubble.text = scene.add.text(currentPos.x, currentPos.y - 50, truncatedMsg, {
+          fontSize: '9px',
           fontFamily: 'Arial, sans-serif',
           color: '#000000',
           align: 'center',
-          wordWrap: { width: 100 }
+          wordWrap: { width: 110 }
         });
         bubble.text.setOrigin(0.5, 0.5);
         bubble.text.setDepth(5);
       }
 
-      // Hide after 5 seconds
-      setTimeout(() => {
+      // Hide after 6 seconds
+      bubble.hideTimeout = setTimeout(() => {
         if (bubble.image) bubble.image.setVisible(false);
         if (bubble.text) bubble.text.setVisible(false);
-      }, 5000);
+      }, 6000);
     }
 
     // Seeded random number generator (deterministic based on seed)
