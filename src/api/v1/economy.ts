@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { EconomyService } from '../../services/economy.service.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
 const economy = new Hono();
@@ -10,7 +10,7 @@ const economy = new Hono();
 /**
  * Get my balance
  */
-economy.get('/balance', authMiddleware, async (c) => {
+economy.get('/balance', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
 
   const account = await EconomyService.getAccount(agentId);
@@ -31,7 +31,7 @@ economy.get('/balance', authMiddleware, async (c) => {
 /**
  * Get my transaction history
  */
-economy.get('/transactions', authMiddleware, async (c) => {
+economy.get('/transactions', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const limit = parseInt(c.req.query('limit') || '20');
 
@@ -52,7 +52,7 @@ const transferSchema = z.object({
   description: z.string().optional(),
 });
 
-economy.post('/transfer', authMiddleware, async (c) => {
+economy.post('/transfer', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = transferSchema.parse(body);
@@ -128,7 +128,7 @@ const purchaseSchema = z.object({
   quantity: z.number().int().positive().default(1),
 });
 
-economy.post('/purchase', authMiddleware, async (c) => {
+economy.post('/purchase', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = purchaseSchema.parse(body);
@@ -154,7 +154,7 @@ economy.post('/purchase', authMiddleware, async (c) => {
 /**
  * Get my inventory
  */
-economy.get('/inventory', authMiddleware, async (c) => {
+economy.get('/inventory', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
 
   const inventory = await EconomyService.getInventory(agentId);
@@ -200,7 +200,7 @@ const tradeSchema = z.object({
   expiresInHours: z.number().positive().optional(),
 });
 
-economy.post('/trades', authMiddleware, async (c) => {
+economy.post('/trades', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = tradeSchema.parse(body);
@@ -229,7 +229,7 @@ economy.post('/trades', authMiddleware, async (c) => {
 /**
  * Get my pending trades
  */
-economy.get('/trades', authMiddleware, async (c) => {
+economy.get('/trades', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
 
   const trades = await EconomyService.getPendingTrades(agentId);
@@ -243,7 +243,7 @@ economy.get('/trades', authMiddleware, async (c) => {
 /**
  * Accept a trade
  */
-economy.post('/trades/:id/accept', authMiddleware, async (c) => {
+economy.post('/trades/:id/accept', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const tradeId = c.req.param('id');
 
@@ -258,7 +258,7 @@ economy.post('/trades/:id/accept', authMiddleware, async (c) => {
 /**
  * Reject a trade
  */
-economy.post('/trades/:id/reject', authMiddleware, async (c) => {
+economy.post('/trades/:id/reject', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const tradeId = c.req.param('id');
 
@@ -273,7 +273,7 @@ economy.post('/trades/:id/reject', authMiddleware, async (c) => {
 /**
  * Cancel a trade (initiator only)
  */
-economy.post('/trades/:id/cancel', authMiddleware, async (c) => {
+economy.post('/trades/:id/cancel', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const tradeId = c.req.param('id');
 

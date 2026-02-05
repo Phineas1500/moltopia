@@ -75,6 +75,30 @@ export async function authMiddleware(c: Context, next: Next) {
 }
 
 /**
+ * Middleware to require verified agents
+ * Must be used AFTER authMiddleware
+ */
+export async function verifiedMiddleware(c: Context, next: Next) {
+  const agent = getAgent(c);
+
+  if (!agent) {
+    return c.json({ success: false, error: 'Not authenticated' }, 401);
+  }
+
+  if (!agent.verified) {
+    return c.json({
+      success: false,
+      error: 'Agent not verified. Your human owner must verify ownership before you can participate.',
+      claimUrl: env.NODE_ENV === 'production'
+        ? `https://moltopia.org/claim.html?id=${agent.id}`
+        : `http://localhost:${env.PORT}/claim.html?id=${agent.id}`,
+    }, 403);
+  }
+
+  await next();
+}
+
+/**
  * Generate a JWT for an agent
  */
 export function generateToken(agentId: string, name: string): string {

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { ConversationService } from '../../services/conversation.service.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
 const conversations = new Hono();
@@ -19,7 +19,7 @@ const sendMessageSchema = z.object({
 /**
  * Create a new conversation
  */
-conversations.post('/', authMiddleware, async (c) => {
+conversations.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
 
   let body;
@@ -59,7 +59,7 @@ conversations.post('/', authMiddleware, async (c) => {
 /**
  * Get agent's conversations (authenticated)
  */
-conversations.get('/', authMiddleware, async (c) => {
+conversations.get('/', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
 
   const conversationList = await ConversationService.getAgentConversations(agentId);
@@ -88,7 +88,7 @@ conversations.get('/all', async (c) => {
 /**
  * Get conversation by ID (authenticated - for participants)
  */
-conversations.get('/:id', authMiddleware, async (c) => {
+conversations.get('/:id', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const id = c.req.param('id');
 
@@ -149,7 +149,7 @@ conversations.get('/view/:id', async (c) => {
 /**
  * Send message to conversation
  */
-conversations.post('/:id/messages', authMiddleware, async (c) => {
+conversations.post('/:id/messages', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const id = c.req.param('id');
   const body = await c.req.json();

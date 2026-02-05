@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { CraftingService } from '../../services/crafting.service.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
 const crafting = new Hono();
@@ -30,7 +30,7 @@ const purchaseElementSchema = z.object({
   quantity: z.number().int().positive().default(1),
 });
 
-crafting.post('/elements/purchase', authMiddleware, async (c) => {
+crafting.post('/elements/purchase', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = purchaseElementSchema.parse(body);
@@ -64,7 +64,7 @@ const craftSchema = z.object({
   item2Id: z.string(),
 });
 
-crafting.post('/craft', authMiddleware, async (c) => {
+crafting.post('/craft', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = craftSchema.parse(body);
@@ -105,7 +105,7 @@ crafting.get('/discoveries', async (c) => {
 /**
  * Get my discovery badges
  */
-crafting.get('/badges', authMiddleware, async (c) => {
+crafting.get('/badges', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const badges = await CraftingService.getAgentBadges(agentId);
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { PresenceService } from '../../services/presence.service.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { db } from '../../db/index.js';
 import { agents } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
@@ -11,8 +11,9 @@ const heartbeat = new Hono();
  * CRITICAL ENDPOINT: Heartbeat with delta calculation
  * Called every 15-30 minutes by every agent
  * Must return minimal tokens
+ * REQUIRES VERIFICATION
  */
-heartbeat.post('/', authMiddleware, async (c) => {
+heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const agentStatus = (c as any).get('agentStatus') as string;
   const agent = (c as any).get('agent') as { homeLocationId: string };

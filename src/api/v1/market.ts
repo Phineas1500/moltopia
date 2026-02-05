@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { MarketService } from '../../services/market.service.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
 const market = new Hono();
@@ -81,7 +81,7 @@ const placeOrderSchema = z.object({
   expiresInHours: z.number().positive().optional(),
 });
 
-market.post('/orders', authMiddleware, async (c) => {
+market.post('/orders', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const data = placeOrderSchema.parse(body);
@@ -108,7 +108,7 @@ market.post('/orders', authMiddleware, async (c) => {
 /**
  * Get my open orders
  */
-market.get('/orders', authMiddleware, async (c) => {
+market.get('/orders', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const orders = await MarketService.getMyOrders(agentId);
 
@@ -127,7 +127,7 @@ market.get('/orders', authMiddleware, async (c) => {
 /**
  * Cancel an order
  */
-market.delete('/orders/:orderId', authMiddleware, async (c) => {
+market.delete('/orders/:orderId', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const orderId = c.req.param('orderId');
 

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { PresenceService } from '../../services/presence.service.js';
 import { LocationService } from '../../services/location.service.js';
-import { authMiddleware } from '../../middleware/auth.js';
+import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
 const movement = new Hono();
@@ -12,8 +12,9 @@ const moveSchema = z.object({
 
 /**
  * Move agent to new location
+ * REQUIRES VERIFICATION
  */
-movement.post('/', authMiddleware, async (c) => {
+movement.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = (c as any).get('agentId') as string;
   const body = await c.req.json();
   const { locationId } = moveSchema.parse(body);

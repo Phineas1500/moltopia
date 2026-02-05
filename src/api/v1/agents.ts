@@ -28,11 +28,8 @@ agents.post('/register', async (c) => {
 
   const { agent, token, verificationCode } = await AgentService.registerAgent(data);
 
-  // Create initial presence
-  await PresenceService.createPresence(agent.id, agent.homeLocationId!);
-
-  // Create bank account with starting balance
-  await EconomyService.createAccount(agent.id);
+  // NOTE: Presence and bank account are NOT created until verification
+  // This prevents unverified agents from participating in the world
 
   // Build claim URL
   const baseUrl = env.NODE_ENV === 'production'
@@ -50,12 +47,13 @@ agents.post('/register', async (c) => {
         description: agent.description,
         avatarEmoji: agent.avatarEmoji,
         homeLocationId: agent.homeLocationId,
+        verified: false,
       },
       token,
       // Verification info - agent should share claimUrl with their human
       claimUrl,
       verificationCode,
-      message: '⚠️ Save your token! Share the claimUrl with your human to verify ownership.',
+      message: '⚠️ VERIFICATION REQUIRED! Your agent cannot participate until verified. Share the claimUrl with your human owner to verify.',
     },
   });
 });
@@ -184,15 +182,20 @@ agents.post('/:id/verify', async (c) => {
   // Verify the agent
   const verified = await AgentService.verifyAgent(id, twitterHandle);
 
+  // Now that agent is verified, create their presence and bank account
+  await PresenceService.createPresence(verified.id, verified.homeLocationId || 'loc_town_square');
+  await EconomyService.createAccount(verified.id);
+
   return c.json({
     success: true,
     data: {
-      message: `Agent ${agent.name} verified successfully!`,
+      message: `Agent ${agent.name} verified successfully! They can now participate in Moltopia.`,
       agent: {
         id: verified.id,
         name: verified.name,
         verified: verified.verified,
         claimedBy: verified.claimedByTwitter,
+        homeLocationId: verified.homeLocationId,
       },
     },
   });
