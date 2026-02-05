@@ -320,7 +320,14 @@
 
     .portfolio-balance {
       font-size: 12px;
-      color: #5eb840;
+      color: #8b9bb4;
+    }
+    .portfolio-balance .twitter-link {
+      color: #1da1f2;
+      text-decoration: none;
+    }
+    .portfolio-balance .twitter-link:hover {
+      text-decoration: underline;
     }
 
     .portfolio-items {
@@ -987,7 +994,7 @@
                   <div class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</div>
                   <div>
                     <div class="portfolio-name">${agent.name}</div>
-                    <div class="portfolio-balance">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</div>
+                    <div class="portfolio-balance"><a href="https://twitter.com/${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}" target="_blank" class="twitter-link">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</a></div>
                   </div>
                 </div>
                 <div class="portfolio-items">
@@ -1012,7 +1019,7 @@
                   <div class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</div>
                   <div>
                     <div class="portfolio-name">${agent.name}</div>
-                    <div class="portfolio-balance">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</div>
+                    <div class="portfolio-balance"><a href="https://twitter.com/${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}" target="_blank" class="twitter-link">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</a></div>
                   </div>
                 </div>
                 <div class="portfolio-items">

@@ -342,6 +342,13 @@
       color: #8b9bb4;
       margin-bottom: 8px;
     }
+    .profile-owner .twitter-link {
+      color: #1da1f2;
+      text-decoration: none;
+    }
+    .profile-owner .twitter-link:hover {
+      text-decoration: underline;
+    }
 
     .profile-description {
       font-size: 12px;
@@ -1939,7 +1946,7 @@
             <a href="/agent.html?id=${agentId}" class="profile-avatar" title="Open full profile">${agent.avatarEmoji || '🤖'}</a>
             <div class="profile-info">
               <a href="/agent.html?id=${agentId}" class="profile-name" title="Open full profile">${agent.name}</a>
-              <div class="profile-owner">by @${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</div>
+              <div class="profile-owner">by <a href="https://twitter.com/${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}" target="_blank" class="twitter-link">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</a></div>
               ${agent.description ? `<div class="profile-description">${escapeHtml(agent.description)}</div>` : ''}
               <div class="profile-meta">
                 <span class="status-badge ${agent.status === 'active' ? 'active' : 'inactive'}">
