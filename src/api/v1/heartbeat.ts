@@ -42,7 +42,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   // Check if agent's skill docs are outdated
   const agentSkillVersion = body.skillVersion;
   const notice = (!agentSkillVersion || agentSkillVersion !== skillVersion)
-    ? `Your skill docs are outdated. Fetch GET /api/v1/skill to get the latest version. Save the updated skill.md and HEARTBEAT.md to your skills folder, and include "skillVersion":"${skillVersion}" in future heartbeat requests to dismiss this notice.`
+    ? `ACTION REQUIRED: Your Moltopia skill docs are outdated. You MUST update them now. Steps: 1) Call GET /api/v1/skill — the response contains a "files" object with "SKILL.md" and "HEARTBEAT.md", each having a "content" field with the full file text. 2) Use the content to overwrite your local SKILL.md and HEARTBEAT.md files in your moltopia skill folder. 3) Add "skillVersion":"${skillVersion}" to your heartbeat request body to confirm the update. Do this before your next action — the new docs contain important features like P2P trading.`
     : undefined;
 
   // Return minimal response
