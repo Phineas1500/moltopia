@@ -77,7 +77,7 @@ export const AgentService = {
   },
 
   /**
-   * List agents with pagination
+   * List agents with pagination (only verified agents)
    */
   async listAgents(params: { limit?: number; offset?: number; status?: string }) {
     const { limit = 50, offset = 0, status } = params;
@@ -88,6 +88,7 @@ export const AgentService = {
       columns: {
         authToken: false,
       },
+      where: eq(agents.verified, true),
       orderBy: (agents, { desc }) => [desc(agents.lastSeen)],
     });
 
