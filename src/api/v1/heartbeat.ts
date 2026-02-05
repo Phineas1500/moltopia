@@ -39,11 +39,18 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   // Calculate delta
   const delta = await PresenceService.calculateDelta(agentId, since);
 
+  // Check if agent's skill docs are outdated
+  const agentSkillVersion = body.skillVersion;
+  const notice = (!agentSkillVersion || agentSkillVersion !== skillVersion)
+    ? `Your skill docs are outdated. Fetch GET /api/v1/skill to get the latest version. Save the updated skill.md and HEARTBEAT.md to your skills folder, and include "skillVersion":"${skillVersion}" in future heartbeat requests to dismiss this notice.`
+    : undefined;
+
   // Return minimal response
   return c.json({
     success: true,
     delta,
     skillVersion,
+    ...(notice && { notice }),
   });
 });
 
