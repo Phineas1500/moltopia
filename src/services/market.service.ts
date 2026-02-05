@@ -372,49 +372,72 @@ export const MarketService = {
       where: eq(items.tradeable, true),
     });
 
-    const summary = [];
-
-    for (const item of allItems) {
-      // Get best bid/ask
-      const bestBid = await db.query.marketOrders.findFirst({
-        where: and(
-          eq(marketOrders.itemId, item.id),
+    // Bulk query: best bids per item
+    const bestBids = await db
+      .select({
+        itemId: marketOrders.itemId,
+        bestPrice: sql<number>`max(${marketOrders.price})`.as('best_price'),
+      })
+      .from(marketOrders)
+      .where(
+        and(
           eq(marketOrders.orderType, 'buy'),
           eq(marketOrders.status, 'open')
-        ),
-        orderBy: [desc(marketOrders.price)],
-      });
+        )
+      )
+      .groupBy(marketOrders.itemId);
 
-      const bestAsk = await db.query.marketOrders.findFirst({
-        where: and(
-          eq(marketOrders.itemId, item.id),
+    // Bulk query: best asks per item
+    const bestAsks = await db
+      .select({
+        itemId: marketOrders.itemId,
+        bestPrice: sql<number>`min(${marketOrders.price})`.as('best_price'),
+      })
+      .from(marketOrders)
+      .where(
+        and(
           eq(marketOrders.orderType, 'sell'),
           eq(marketOrders.status, 'open')
-        ),
-        orderBy: [asc(marketOrders.price)],
-      });
+        )
+      )
+      .groupBy(marketOrders.itemId);
 
-      // Get last trade
-      const lastTrade = await db.query.marketTrades.findFirst({
-        where: eq(marketTrades.itemId, item.id),
-        orderBy: [desc(marketTrades.createdAt)],
-      });
+    // Bulk query: last trade price per item (using DISTINCT ON)
+    const lastTrades = await db.execute<{ item_id: string; price: number }>(sql`
+      SELECT DISTINCT ON (item_id) item_id, price
+      FROM market_trades
+      ORDER BY item_id, created_at DESC
+    `);
 
-      summary.push({
-        item: {
-          id: item.id,
-          name: item.name,
-          emoji: item.emoji,
-          category: item.category,
-          currentSupply: item.currentSupply,
-        },
-        bestBid: bestBid?.price || null,
-        bestAsk: bestAsk?.price || null,
-        lastPrice: lastTrade?.price || (item.category === 'base_element' ? item.basePrice : null),
-        volume24h: 0, // TODO: Calculate
-      });
-    }
+    // Bulk query: 24h volume per item
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const volumes = await db
+      .select({
+        itemId: marketTrades.itemId,
+        volume: sql<number>`coalesce(sum(${marketTrades.quantity}), 0)::int`.as('volume'),
+      })
+      .from(marketTrades)
+      .where(sql`${marketTrades.createdAt} > ${oneDayAgo.toISOString()}`)
+      .groupBy(marketTrades.itemId);
 
-    return summary;
+    // Build lookup maps
+    const bidMap = new Map(bestBids.map(b => [b.itemId, b.bestPrice]));
+    const askMap = new Map(bestAsks.map(a => [a.itemId, a.bestPrice]));
+    const lastTradeMap = new Map((lastTrades as unknown as { item_id: string; price: number }[]).map(t => [t.item_id, t.price]));
+    const volumeMap = new Map(volumes.map(v => [v.itemId, v.volume]));
+
+    return allItems.map(item => ({
+      item: {
+        id: item.id,
+        name: item.name,
+        emoji: item.emoji,
+        category: item.category,
+        currentSupply: item.currentSupply,
+      },
+      bestBid: bidMap.get(item.id) || null,
+      bestAsk: askMap.get(item.id) || null,
+      lastPrice: lastTradeMap.get(item.id) || (item.category === 'base_element' ? item.basePrice : null),
+      volume24h: volumeMap.get(item.id) || 0,
+    }));
   },
 };

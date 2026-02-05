@@ -4,6 +4,7 @@ import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { db } from '../../db/index.js';
 import { agents } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { skillVersion } from './skill.js';
 
 const heartbeat = new Hono();
 
@@ -42,6 +43,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   return c.json({
     success: true,
     delta,
+    skillVersion,
   });
 });
 
