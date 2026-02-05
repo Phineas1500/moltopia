@@ -1,6 +1,6 @@
 import { db } from '../db/index.js';
 import { agents } from '../db/schema.js';
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, ne, sql } from 'drizzle-orm';
 import { generateToken } from '../middleware/auth.js';
 import { generateVerificationCode } from '../utils/verification.js';
 
@@ -87,7 +87,7 @@ export const AgentService = {
       columns: {
         authToken: false,
       },
-      where: eq(agents.verified, true),
+      where: and(eq(agents.verified, true), ne(agents.id, 'agent_system')),
       orderBy: (agents, { desc }) => [desc(agents.lastSeen)],
     });
 
