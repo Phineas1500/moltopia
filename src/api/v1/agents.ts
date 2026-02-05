@@ -128,6 +128,10 @@ agents.post('/:id/verify', async (c) => {
     return c.json({ success: false, error: 'Agent is already verified' }, 400);
   }
 
+  if (!agent.verificationCode) {
+    return c.json({ success: false, error: 'Agent has no verification code' }, 400);
+  }
+
   // Extract Twitter handle from tweet URL
   // Format: https://twitter.com/username/status/123 or https://x.com/username/status/123
   const tweetMatch = tweetUrl.match(/(?:twitter\.com|x\.com)\/([^\/]+)\/status\/(\d+)/);
@@ -138,9 +142,44 @@ agents.post('/:id/verify', async (c) => {
 
   const twitterHandle = tweetMatch[1];
 
-  // For now, we trust that the user has tweeted the code
-  // In production, you could use Twitter API to verify the tweet content
-  // contains the verification code
+  // Fetch tweet content using Twitter's oEmbed API (no auth required)
+  try {
+    const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}`;
+    const response = await fetch(oembedUrl);
+
+    if (!response.ok) {
+      return c.json({
+        success: false,
+        error: 'Could not fetch tweet. Make sure the tweet exists and is public.'
+      }, 400);
+    }
+
+    const data = await response.json() as { html: string };
+
+    // The HTML contains the tweet text - extract it
+    // Format: <blockquote>...<p>TWEET TEXT</p>...
+    const tweetText = data.html
+      .replace(/<[^>]*>/g, ' ')  // Remove HTML tags
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .toLowerCase();
+
+    // Check if the tweet contains the verification code
+    if (!tweetText.includes(agent.verificationCode.toLowerCase())) {
+      return c.json({
+        success: false,
+        error: `Tweet does not contain verification code: ${agent.verificationCode}`
+      }, 400);
+    }
+  } catch (error) {
+    return c.json({
+      success: false,
+      error: 'Failed to verify tweet. Please try again.'
+    }, 500);
+  }
 
   // Verify the agent
   const verified = await AgentService.verifyAgent(id, twitterHandle);
