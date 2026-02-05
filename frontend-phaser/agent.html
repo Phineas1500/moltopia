@@ -625,7 +625,7 @@
     }
 
     function renderProfile() {
-      const { agent, presence, relationshipSummary, relationships, conversations, presenceHistory } = agentData;
+      const { agent, presence, relationshipSummary, relationships, conversations, presenceHistory, balance } = agentData;
       const location = presence?.locationId ? locations.get(presence.locationId) : null;
       const homeLocation = agent.homeLocationId ? locations.get(agent.homeLocationId) : null;
 
@@ -678,6 +678,10 @@
               <div class="stat-box">
                 <div class="stat-value">${agent.reputation || 0}</div>
                 <div class="stat-label">Reputation</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-value">$${(balance || 0).toLocaleString()}</div>
+                <div class="stat-label">Cash</div>
               </div>
             </div>
           </div>

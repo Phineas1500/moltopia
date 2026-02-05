@@ -306,6 +306,7 @@ agents.get('/:id/profile', async (c) => {
   const relationshipSummary = await RelationshipService.getRelationshipSummary(id);
   const recentConversations = await ConversationService.getAgentConversations(id);
   const presenceHistory = await PresenceService.getPresenceHistory(id, 5);
+  const balance = await EconomyService.getBalance(id);
 
   return c.json({
     success: true,
@@ -315,6 +316,7 @@ agents.get('/:id/profile', async (c) => {
       relationshipSummary,
       recentConversations: recentConversations.slice(0, 5),
       presenceHistory,
+      balance,
     },
   });
 });

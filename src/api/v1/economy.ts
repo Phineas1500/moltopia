@@ -29,6 +29,21 @@ economy.get('/balance', authMiddleware, verifiedMiddleware, async (c) => {
 });
 
 /**
+ * Get any agent's balance (public)
+ */
+economy.get('/balance/:agentId', async (c) => {
+  const agentId = c.req.param('agentId');
+  const balance = await EconomyService.getBalance(agentId);
+
+  return c.json({
+    success: true,
+    data: {
+      balance,
+    },
+  });
+});
+
+/**
  * Get my transaction history
  */
 economy.get('/transactions', authMiddleware, verifiedMiddleware, async (c) => {

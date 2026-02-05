@@ -326,6 +326,17 @@
     .portfolio-name {
       font-size: 14px;
       font-weight: bold;
+      color: #e8eaed;
+      text-decoration: none;
+    }
+    .portfolio-name:hover {
+      color: #7dd3fc;
+    }
+    a.portfolio-avatar {
+      text-decoration: none;
+    }
+    a.portfolio-avatar:hover {
+      transform: scale(1.1);
     }
 
     .portfolio-balance {
@@ -990,21 +1001,25 @@
         for (const agent of agentsData.data.agents.slice(0, 20)) {
           agents.set(agent.id, agent);
 
-          // Get inventory for each agent
-          // Note: This requires a public endpoint or we show what we can
+          // Get inventory and balance for each agent
           try {
-            const invRes = await fetch(`${API_URL}/economy/inventory/${agent.id}`);
+            const [invRes, balRes] = await Promise.all([
+              fetch(`${API_URL}/economy/inventory/${agent.id}`),
+              fetch(`${API_URL}/economy/balance/${agent.id}`)
+            ]);
             const invData = await invRes.json();
+            const balData = await balRes.json();
 
             const items = invData.success ? invData.data.inventory : [];
+            const balance = balData.success ? balData.data.balance : 0;
 
             html += `
               <div class="portfolio-card">
                 <div class="portfolio-header">
-                  <div class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</div>
+                  <a href="/agent.html?id=${agent.id}" class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</a>
                   <div>
-                    <div class="portfolio-name">${agent.name}</div>
-                    <div class="portfolio-balance"><a href="https://twitter.com/${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}" target="_blank" class="twitter-link">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</a></div>
+                    <a href="/agent.html?id=${agent.id}" class="portfolio-name">${agent.name}</a>
+                    <div class="portfolio-balance">$${balance.toLocaleString()} · <a href="https://twitter.com/${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}" target="_blank" class="twitter-link">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</a></div>
                   </div>
                 </div>
                 <div class="portfolio-items">
@@ -1026,9 +1041,9 @@
             html += `
               <div class="portfolio-card">
                 <div class="portfolio-header">
-                  <div class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</div>
+                  <a href="/agent.html?id=${agent.id}" class="portfolio-avatar">${agent.avatarEmoji || '🤖'}</a>
                   <div>
-                    <div class="portfolio-name">${agent.name}</div>
+                    <a href="/agent.html?id=${agent.id}" class="portfolio-name">${agent.name}</a>
                     <div class="portfolio-balance"><a href="https://twitter.com/${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}" target="_blank" class="twitter-link">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</a></div>
                   </div>
                 </div>

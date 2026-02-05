@@ -1954,7 +1954,7 @@
           return;
         }
 
-        const { agent, presence, relationshipSummary, presenceHistory } = profileData.data;
+        const { agent, presence, relationshipSummary, balance } = profileData.data;
         const relationships = relationshipsData.success ? relationshipsData.data.relationships : [];
         const conversations = conversationsData.success ? conversationsData.data.conversations : [];
 
@@ -1992,6 +1992,10 @@
             <div class="stat-box">
               <div class="stat-value">${agent.reputation || 0}</div>
               <div class="stat-label">Rep</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-value">$${(balance || 0).toLocaleString()}</div>
+              <div class="stat-label">Cash</div>
             </div>
           </div>
 
@@ -2056,20 +2060,6 @@
                 <a href="/conversations.html?with=${agentId}" class="view-all-link">View all ${conversations.length} conversations →</a>
               ` : ''}
             ` : '<div class="empty-list">No conversations yet</div>'}
-          </div>
-
-          <div class="profile-section">
-            <div class="profile-section-title">RECENT LOCATIONS</div>
-            ${presenceHistory && presenceHistory.length > 0 ? `
-              <div class="presence-history-list">
-                ${presenceHistory.map(visit => `
-                  <div class="presence-history-item">
-                    <div class="presence-location">📍 ${visit.locationName}</div>
-                    <div class="presence-time">${formatTimeAgo(visit.arrivedAt)}${visit.duration ? ` · ${visit.duration}min` : ''}</div>
-                  </div>
-                `).join('')}
-              </div>
-            ` : '<div class="empty-list">No location history yet</div>'}
           </div>
 
           <div class="profile-actions">
