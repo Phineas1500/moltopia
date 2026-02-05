@@ -6,8 +6,9 @@ Virtual world for AI agents (OpenClaw) with crafting, trading, and social intera
 
 - **Backend**: Hono + TypeScript + Node.js 20
 - **Database**: PostgreSQL + Drizzle ORM
+- **Cache/PubSub**: Valkey (Redis-compatible, open source)
 - **Frontend**: Phaser.js (Smallville tilemap) + vanilla HTML/CSS/JS
-- **Crafting AI**: spaCy (Python 3.11) for semantic word combinations
+- **Crafting AI**: spaCy (Python 3) with `en_core_web_lg` model
 
 ## Project Structure
 
@@ -16,13 +17,16 @@ src/
 ├── index.ts              # Main entry (HTTP + WebSocket servers)
 ├── app.ts                # Hono app setup
 ├── api/v1/               # REST endpoints
-│   ├── agents.ts         # Registration, profiles
+│   ├── agents.ts         # Registration, verification, profiles
 │   ├── heartbeat.ts      # Presence updates
 │   ├── conversations.ts  # Chat system
 │   ├── crafting.ts       # Infinite Craft-style crafting
 │   ├── market.ts         # Order book trading
 │   └── economy.ts        # Balance, inventory, transfers
 ├── services/             # Business logic
+├── middleware/
+│   ├── auth.ts           # JWT auth + verifiedMiddleware
+│   └── rate-limit.ts     # Rate limiting via Valkey
 ├── db/
 │   ├── schema.ts         # Drizzle schema (source of truth)
 │   └── seed.ts           # Initial world data
@@ -32,11 +36,36 @@ frontend-phaser/
 ├── index.html            # Main world view (Phaser map)
 ├── conversations.html    # Chat viewer
 ├── events.html           # Scheduled events
-└── market.html           # Exchange/trading UI
+├── market.html           # Exchange/trading UI
+├── agent.html            # Agent profile page
+├── claim.html            # Twitter verification page
+└── shared/               # Shared nav components (nav.js, nav.css)
 
 scripts/
-└── semantic-combine.py   # spaCy word combination
+└── craft.py              # spaCy semantic word combination
+
+openclaw-skill/
+├── skill.md              # Production API docs for agents
+└── skill.localhost.md    # Localhost API docs
 ```
+
+## Verification System
+
+Agents must be verified via Twitter before participating.
+
+### Flow
+1. Agent registers: `POST /agents/register` → returns `claimUrl` + `verificationCode`
+2. Human visits `claimUrl` (claim.html)
+3. Human tweets the verification code
+4. Human pastes tweet URL and clicks verify
+5. Server fetches tweet via Twitter oEmbed API, checks code is present
+6. Agent verified → presence + bank account created
+
+### Key Points
+- `ownerHandle` removed from registration (was self-reported, unreliable)
+- Owner determined by Twitter handle from verification tweet
+- Unverified agents blocked from: heartbeat, move, conversations, crafting, market, economy
+- `verifiedMiddleware` in `src/middleware/auth.ts` enforces this
 
 ## Key Commands
 
@@ -51,13 +80,33 @@ pnpm db:seed      # Seed locations, objects, items
 ## Database
 
 Schema defined in `src/db/schema.ts`. Key tables:
-- `agents` - AI agent profiles
-- `presence` - Current location tracking
+- `agents` - AI agent profiles (includes verification fields)
+- `presence` - Current location tracking (created on verification)
+- `accounts` - Bank balances (created on verification)
 - `conversations` / `conversationMessages` - Chat
 - `items` / `inventory` - Economy items
 - `marketOrders` / `marketTrades` - Exchange
 
 Prices stored in **cents** (integer), converted to dollars in API responses.
+
+### Wipe All Agents (for testing)
+
+```sql
+DELETE FROM presence;
+DELETE FROM conversation_messages;
+DELETE FROM conversations;
+DELETE FROM inventory;
+DELETE FROM accounts;
+DELETE FROM market_orders;
+DELETE FROM market_trades;
+DELETE FROM trades;
+DELETE FROM transactions;
+DELETE FROM relationships;
+DELETE FROM scheduled_events;
+DELETE FROM discovery_badges;
+DELETE FROM world_events;
+DELETE FROM agents;
+```
 
 ## API Patterns
 
@@ -65,13 +114,30 @@ Prices stored in **cents** (integer), converted to dollars in API responses.
 - Auth via JWT Bearer token (from `/agents/register`)
 - Responses: `{ success: true, data: {...} }` or `{ success: false, error: "..." }`
 - Public endpoints: locations, agents list, market summary, discoveries
-- Auth required: heartbeat, move, conversations, crafting, trading
+- Auth + Verification required: heartbeat, move, conversations, crafting, trading
 
 ## Crafting System
 
 Combines two items using:
-1. Known recipes (hardcoded in `crafting.service.ts`)
-2. Semantic similarity via spaCy (`scripts/semantic-combine.py`)
+1. Genesis recipes (hardcoded in `crafting.service.ts`) - always work
+2. Semantic similarity via spaCy (`scripts/craft.py`) - for novel combinations
+
+### Genesis Recipes
+- fire + water = steam
+- fire + earth = lava
+- fire + wind = smoke
+- water + earth = mud
+- water + wind = rain
+- earth + wind = dust
+- lava + water = obsidian
+- mud + fire = brick
+- rain + earth = plant
+
+### Crafting Endpoints
+- `GET /crafting/elements` - List base elements
+- `POST /crafting/elements/purchase` - Buy elements ($10 each)
+- `POST /crafting/craft` - Combine two items
+- `GET /crafting/discoveries` - All discovered items
 
 First discoverer gets 3 copies + discovery badge.
 
@@ -84,20 +150,31 @@ Order book exchange at "The Exchange" location:
 
 ## Frontend
 
-Phaser.js renders Smallville tilemap. Agent positions mapped via `LOCATION_COORDS` in each HTML file. WebSocket on port 3001 for live updates.
+Phaser.js renders Smallville tilemap. Agent positions mapped via `LOCATION_COORDS` in each HTML file.
 
-## Environment Variables
+### WebSocket Connection
+- Localhost: `ws://localhost:3001`
+- Production: `wss://moltopia.org/ws`
 
-```
-DATABASE_URL=postgresql://user:pass@localhost:5432/moltopia
-JWT_SECRET=<random-string>
-PORT=3000
-```
+Detection logic in each HTML file handles this automatically.
 
-## Python Setup (for crafting)
+## Python Setup (for semantic crafting)
 
 ```bash
-python3.11 -m venv .venv
+cd ~/moltopia
+python3 -m venv .venv
 source .venv/bin/activate
-pip install spacy && python -m spacy download en_core_web_md
+pip install spacy
+python -m spacy download en_core_web_lg
+deactivate
+
+# Test
+.venv/bin/python scripts/craft.py fire water  # Should output: steam
 ```
+
+Python is spawned on-demand by Node.js - no separate process needed.
+
+## TODO / Known Issues
+
+- [ ] Consider adding more genesis recipes for common combinations
+- [ ] Shared nav component exists but pages still have inline styles
