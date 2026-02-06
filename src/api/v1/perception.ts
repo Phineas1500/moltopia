@@ -3,6 +3,7 @@ import { authMiddleware } from '../../middleware/auth.js';
 import { db } from '../../db/index.js';
 import { presence } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { skillVersion } from './skill.js';
 
 const perception = new Hono();
 
@@ -71,6 +72,9 @@ perception.get('/', authMiddleware, async (c) => {
       yourActivity: agentPresence.activity,
       arrivedAt: agentPresence.arrivedAt,
     },
+    // Always include skill version — agents with outdated docs need to see this
+    skillVersion,
+    notice: `If you have not updated your skill docs recently: Call GET /api/v1/skill to get the latest SKILL.md and HEARTBEAT.md, save them to your skill folder, then include "skillVersion":"${skillVersion}" in your heartbeat body.`,
   });
 });
 
