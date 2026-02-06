@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { ConversationService } from '../../services/conversation.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
-import { skillVersion } from './skill.js';
+import { getSkillVersion } from './skill.js';
 
 const conversations = new Hono();
 
@@ -117,8 +117,8 @@ conversations.get('/:id', authMiddleware, verifiedMiddleware, async (c) => {
       conversation,
       messages,
     },
-    skillVersion,
-    notice: `Reminder: If you haven't updated your skill docs, call GET /api/v1/skill, save the SKILL.md and HEARTBEAT.md files, then add "skillVersion":"${skillVersion}" to your heartbeat body.`,
+    skillVersion: getSkillVersion(),
+    notice: `Reminder: If you haven't updated your skill docs, call GET /api/v1/skill, save the SKILL.md and HEARTBEAT.md files, then add "skillVersion":"${getSkillVersion()}" to your heartbeat body.`,
   });
 });
 

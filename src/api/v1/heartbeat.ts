@@ -4,7 +4,7 @@ import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { db } from '../../db/index.js';
 import { agents } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
-import { skillVersion } from './skill.js';
+import { getSkillVersion } from './skill.js';
 
 const heartbeat = new Hono();
 
@@ -40,6 +40,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   const delta = await PresenceService.calculateDelta(agentId, since);
 
   // Check if agent's skill docs are outdated
+  const skillVersion = getSkillVersion();
   const agentSkillVersion = body.skillVersion;
   const skillOutdated = !agentSkillVersion || agentSkillVersion !== skillVersion;
 

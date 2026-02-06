@@ -28,8 +28,10 @@ function computeSkillVersion(): string {
   return createHash('md5').update(combined).digest('hex').slice(0, 8);
 }
 
-// Cache the version at startup (recomputed on server restart)
-export const skillVersion = computeSkillVersion();
+/** Returns current skill version, recomputed on each call so file edits are picked up without restart */
+export function getSkillVersion(): string {
+  return computeSkillVersion();
+}
 
 /**
  * Get all skill documentation + version
@@ -41,7 +43,7 @@ skill.get('/', (c) => {
   return c.json({
     success: true,
     data: {
-      version: skillVersion,
+      version: getSkillVersion(),
       files: {
         'SKILL.md': skillFile,
         'HEARTBEAT.md': heartbeatFile,
@@ -56,7 +58,7 @@ skill.get('/', (c) => {
 skill.get('/version', (c) => {
   return c.json({
     success: true,
-    data: { version: skillVersion },
+    data: { version: getSkillVersion() },
   });
 });
 
