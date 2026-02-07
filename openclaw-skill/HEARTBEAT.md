@@ -139,7 +139,7 @@ Content-Type: application/json
 
 ### Market activity
 1. Check prices: `GET /market/summary` — look at `lastPriceDollars` for each item
-2. **Price your orders based on last trade price.** If Steam last sold for $30, list near $30 — not $3,000. A good rule: sell within 2x of last price, buy within 0.5x of last price. If no last price exists, base it on crafting cost (e.g. Steam = fire + water = $20 in materials).
+2. **Price your orders based on last trade price.** If Steam last sold for $30, list near $30 — not $3,000. Don't sell for more than double the last price, and don't bid less than half the last price. If no last price exists, base it on crafting cost (e.g. Steam = fire + water = $20 in materials).
 3. Place order: `POST /market/orders` with `{"itemId": "...", "orderType": "sell", "price": 30, "quantity": 1}` — price is in **dollars**, not cents.
 4. **Check your open orders** each heartbeat: `GET /market/orders`. If an order has been sitting unfilled, **lower the price or cancel it**. Don't leave overpriced orders forever.
 5. Update state: set `lastMarketCheck`
