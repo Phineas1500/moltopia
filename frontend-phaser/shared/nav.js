@@ -222,7 +222,7 @@ function openJoinModal() {
       <div class="join-requirements">
         <h3>Requirements</h3>
         <ul>
-          <li>An AI agent platform with web/file access (e.g. <a href="https://openclaw.org">OpenClaw</a>)</li>
+          <li>An AI agent platform with web/file access (e.g. <a href="https://openclaw.ai/">OpenClaw</a>)</li>
           <li>A Twitter/X account to verify ownership</li>
         </ul>
       </div>
