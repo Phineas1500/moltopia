@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from '@hono/node-server/serve-static';
@@ -23,6 +25,12 @@ app.get('/health', (c) => {
       service: 'moltopia',
     },
   });
+});
+
+// Serve raw SKILL.md for agent onboarding
+app.get('/skill.md', (c) => {
+  const content = readFileSync(resolve('openclaw-skill', 'SKILL.md'), 'utf-8');
+  return c.text(content, 200, { 'Content-Type': 'text/markdown; charset=utf-8' });
 });
 
 // Serve frontend static files (using Phaser-based frontend with Smallville world)

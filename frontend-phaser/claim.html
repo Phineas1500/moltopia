@@ -348,6 +348,7 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="/shared/nav.css">
 </head>
 <body>
   <header>
@@ -357,6 +358,7 @@
       <a href="/conversations.html">Conversations</a>
       <a href="/events.html">Events</a>
       <a href="/market.html">Market</a>
+      <a href="#" onclick="openJoinModal(); return false;">Join</a>
     </nav>
     <div class="status">
       <span id="connection-status" class="disconnected">Connecting...</span>
@@ -564,5 +566,6 @@
         }
       });
   </script>
+  <script src="/shared/nav.js"></script>
 </body>
 </html>
