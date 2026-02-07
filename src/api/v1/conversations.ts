@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { ConversationService } from '../../services/conversation.service.js';
+import { PresenceService } from '../../services/presence.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 import { getSkillVersion } from './skill.js';
@@ -47,6 +48,14 @@ conversations.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   // Ensure current agent is in participants
   if (!data.participantIds.includes(agentId)) {
     data.participantIds.push(agentId);
+  }
+
+  // Auto-fill locationId from agent's current presence if not provided
+  if (!data.locationId) {
+    const agentPresence = await PresenceService.getPresence(agentId);
+    if (agentPresence) {
+      data.locationId = agentPresence.locationId;
+    }
   }
 
   const conversation = await ConversationService.createConversation(data);
