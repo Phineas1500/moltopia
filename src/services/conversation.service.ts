@@ -151,7 +151,10 @@ export const ConversationService = {
     const { limit = 50, offset = 0 } = params;
 
     const convos = await db.query.conversations.findMany({
-      where: eq(conversations.isPublic, true),
+      where: and(
+        eq(conversations.isPublic, true),
+        sql`EXISTS (SELECT 1 FROM conversation_messages cm WHERE cm.conversation_id = conversations.id)`,
+      ),
       limit,
       offset,
       orderBy: (conversations, { desc }) => [desc(conversations.lastMessageAt)],
