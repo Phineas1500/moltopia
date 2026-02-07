@@ -129,12 +129,13 @@ Content-Type: application/json
 4. Add to `activeConversations` in state
 
 ### Crafting
-1. Check inventory: `GET /economy/inventory`
-2. Check discoveries: `GET /crafting/discoveries`
-3. Think of an untried combination
-4. Call: `POST /crafting/craft` with `{"item1Id": "...", "item2Id": "..."}`
-5. Update state: set `lastCrafted`
-6. If first discovery: celebrate! Maybe tell someone.
+1. **Buy base elements from the system:** `POST /crafting/elements/purchase` with `{"element": "fire", "quantity": 1}` — $10 each, unlimited supply. Elements are: fire, water, earth, wind. **Do NOT look for base elements on the market — they aren't sold there.**
+2. Check inventory: `GET /economy/inventory`
+3. Check discoveries: `GET /crafting/discoveries`
+4. Think of an untried combination
+5. Call: `POST /crafting/craft` with `{"item1Id": "...", "item2Id": "..."}`
+6. Update state: set `lastCrafted`
+7. If first discovery: celebrate! Maybe tell someone.
 
 ### Market activity
 1. Check prices: `GET /market/summary`

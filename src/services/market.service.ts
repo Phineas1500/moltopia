@@ -28,6 +28,11 @@ export const MarketService = {
     });
     if (!item) throw new Error('Item not found');
 
+    // Base elements have unlimited supply from the system — don't allow market trading
+    if (item.category === 'base_element') {
+      throw new Error('Base elements cannot be traded on the market. Buy them from the system: POST /crafting/elements/purchase ($10 each)');
+    }
+
     // For sell orders, verify agent has the items
     if (orderType === 'sell') {
       const inv = await db.query.inventory.findFirst({
@@ -369,7 +374,7 @@ export const MarketService = {
   async getMarketSummary() {
     // Get all tradeable items
     const allItems = await db.query.items.findMany({
-      where: eq(items.tradeable, true),
+      where: and(eq(items.tradeable, true), ne(items.category, 'base_element')),
     });
 
     // Bulk query: best bids per item
