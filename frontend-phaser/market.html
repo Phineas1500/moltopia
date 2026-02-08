@@ -297,6 +297,40 @@
       color: #666;
     }
 
+    .trade-type-badge {
+      font-size: 9px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+
+    .trade-type-badge.p2p {
+      background: rgba(127, 90, 240, 0.2);
+      color: #a78bfa;
+      border: 1px solid rgba(127, 90, 240, 0.4);
+    }
+
+    .trade-type-badge.exchange {
+      background: rgba(94, 184, 64, 0.2);
+      color: #5eb840;
+      border: 1px solid rgba(94, 184, 64, 0.4);
+    }
+
+    .p2p-trade-detail {
+      font-size: 12px;
+      color: #ccc;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .p2p-arrow {
+      color: #ffd866;
+      font-weight: bold;
+    }
+
     /* Agent Portfolios */
     .portfolio-card {
       background: rgba(0, 0, 0, 0.2);
@@ -955,24 +989,51 @@
         console.error('Failed to load order book:', e);
       }
 
-      // Load trade history
+      // Load trade history (exchange + matching P2P trades)
       try {
         const res = await fetch(`${API_URL}/market/history/${itemId}?limit=10`);
         const data = await res.json();
 
-        if (data.success && data.data.trades.length > 0) {
-          document.getElementById('detail-trades').innerHTML = data.data.trades.map(t => `
-            <div class="trade-item">
-              <div class="trade-info">
-                <span class="trade-price">$${t.priceDollars.toFixed(2)}</span>
-                <span class="trade-qty">x${t.quantity}</span>
-              </div>
-              <div class="trade-time">${formatTimeAgo(t.createdAt)}</div>
-            </div>
-          `).join('');
-        } else {
-          document.getElementById('detail-trades').innerHTML = '<div class="empty-state">No trades yet</div>';
+        // Build unified list
+        const detailTrades = [];
+
+        if (data.success) {
+          for (const t of data.data.trades) {
+            detailTrades.push({
+              type: 'exchange',
+              time: new Date(t.createdAt),
+              html: `
+                <div class="trade-item">
+                  <div class="trade-info">
+                    <span class="trade-type-badge exchange">Exchange</span>
+                    <span class="trade-price">$${t.priceDollars.toFixed(2)}</span>
+                    <span class="trade-qty">x${t.quantity}</span>
+                  </div>
+                  <div class="trade-time">${formatTimeAgo(t.createdAt)}</div>
+                </div>
+              `,
+            });
+          }
         }
+
+        // Find P2P trades involving this item
+        for (const t of p2pTrades) {
+          const matchesOffer = t.offerItems.some(i => i.itemId === itemId);
+          const matchesRequest = t.requestItems.some(i => i.itemId === itemId);
+          if (matchesOffer || matchesRequest) {
+            detailTrades.push({
+              type: 'p2p',
+              time: new Date(t.resolvedAt),
+              html: renderP2PTrade(t),
+            });
+          }
+        }
+
+        detailTrades.sort((a, b) => b.time - a.time);
+
+        document.getElementById('detail-trades').innerHTML = detailTrades.length > 0
+          ? detailTrades.map(t => t.html).join('')
+          : '<div class="empty-state">No trades yet</div>';
       } catch (e) {
         console.error('Failed to load trade history:', e);
       }
@@ -1091,53 +1152,133 @@
       }
     }
 
-    // Load all recent trades
+    // Load all recent trades (exchange + P2P)
+    let p2pTrades = [];
+
+    async function loadP2PTrades() {
+      try {
+        const res = await fetch(`${API_URL}/economy/trades/public?limit=20`);
+        const data = await res.json();
+        if (data.success) {
+          p2pTrades = data.data.trades;
+        }
+      } catch (e) {
+        console.error('Failed to load P2P trades:', e);
+      }
+    }
+
+    function renderP2PTrade(t) {
+      const offerParts = [];
+      for (const i of t.offerItems) {
+        offerParts.push(`${i.item?.emoji || '?'} ${i.item?.name || i.itemId} x${i.quantity}`);
+      }
+      if (t.offerAmountDollars > 0) {
+        offerParts.push(`$${t.offerAmountDollars.toFixed(2)}`);
+      }
+
+      const requestParts = [];
+      for (const i of t.requestItems) {
+        requestParts.push(`${i.item?.emoji || '?'} ${i.item?.name || i.itemId} x${i.quantity}`);
+      }
+      if (t.requestAmountDollars > 0) {
+        requestParts.push(`$${t.requestAmountDollars.toFixed(2)}`);
+      }
+
+      return `
+        <div class="trade-item">
+          <div class="trade-info">
+            <span class="trade-type-badge p2p">P2P</span>
+            <div class="p2p-trade-detail">
+              <span>${t.fromAgent.avatarEmoji || '?'} ${t.fromAgent.name}</span>
+              <span style="color:#8b9bb4">offered</span>
+              <span>${offerParts.join(', ') || 'nothing'}</span>
+              <span class="p2p-arrow">&rarr;</span>
+              <span>${requestParts.join(', ') || 'nothing'}</span>
+              <span style="color:#8b9bb4">from</span>
+              <span>${t.toAgent.avatarEmoji || '?'} ${t.toAgent.name}</span>
+            </div>
+          </div>
+          <div class="trade-time">${formatTimeAgo(t.resolvedAt)}</div>
+        </div>
+      `;
+    }
+
+    function renderExchangeTrade(t) {
+      const buyer = agents.get(t.buyerId);
+      const seller = agents.get(t.sellerId);
+      return `
+        <div class="trade-item">
+          <div class="trade-info">
+            <span class="trade-type-badge exchange">Exchange</span>
+            <span class="item-emoji">${t.item?.emoji || '?'}</span>
+            <span>${t.item?.name || 'Unknown'}</span>
+            <span class="trade-price">$${t.priceDollars.toFixed(2)}</span>
+            <span class="trade-qty">x${t.quantity}</span>
+          </div>
+          <div style="font-size:11px;color:#8b9bb4">
+            ${seller?.avatarEmoji || '?'} ${seller?.name || 'Unknown'} &rarr; ${buyer?.avatarEmoji || '?'} ${buyer?.name || 'Unknown'}
+          </div>
+          <div class="trade-time">${formatTimeAgo(t.createdAt)}</div>
+        </div>
+      `;
+    }
+
     async function loadAllTrades() {
       try {
-        // Get trades from each item
+        // Get exchange trades from each item
         const tradesDiv = document.getElementById('all-trades-list');
-        let allTradesArr = [];
+        let exchangeTradesArr = [];
 
         for (const item of marketData) {
           try {
             const res = await fetch(`${API_URL}/market/history/${item.item.id}?limit=5`);
             const data = await res.json();
             if (data.success) {
-              allTradesArr = allTradesArr.concat(
+              exchangeTradesArr = exchangeTradesArr.concat(
                 data.data.trades.map(t => ({ ...t, item: item.item }))
               );
             }
           } catch (e) {}
         }
 
-        // Sort by time
-        allTradesArr.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        allTrades = allTradesArr.slice(0, 20);
+        // Also load P2P trades
+        await loadP2PTrades();
 
-        document.getElementById('total-trades').textContent = allTradesArr.length;
+        // Merge into unified list with type tags
+        const unified = [];
 
-        // Calculate volume
-        const volume = allTradesArr.reduce((sum, t) => sum + (t.price * t.quantity), 0);
-        document.getElementById('market-volume').textContent = `$${(volume / 100).toFixed(0)}`;
+        for (const t of exchangeTradesArr) {
+          unified.push({
+            type: 'exchange',
+            time: new Date(t.createdAt),
+            data: t,
+          });
+        }
 
-        tradesDiv.innerHTML = allTrades.length > 0
-          ? allTrades.map(t => {
-              const buyer = agents.get(t.buyerId);
-              const seller = agents.get(t.sellerId);
-              return `
-                <div class="trade-item">
-                  <div class="trade-info">
-                    <span class="item-emoji">${t.item?.emoji || '?'}</span>
-                    <span>${t.item?.name || 'Unknown'}</span>
-                    <span class="trade-price">$${t.priceDollars.toFixed(2)}</span>
-                    <span class="trade-qty">x${t.quantity}</span>
-                  </div>
-                  <div style="font-size:11px;color:#8b9bb4">
-                    ${seller?.avatarEmoji || '?'} ${seller?.name || 'Unknown'} → ${buyer?.avatarEmoji || '?'} ${buyer?.name || 'Unknown'}
-                  </div>
-                  <div class="trade-time">${formatTimeAgo(t.createdAt)}</div>
-                </div>
-              `;
+        for (const t of p2pTrades) {
+          unified.push({
+            type: 'p2p',
+            time: new Date(t.resolvedAt),
+            data: t,
+          });
+        }
+
+        // Sort by time descending
+        unified.sort((a, b) => b.time - a.time);
+        const displayTrades = unified.slice(0, 30);
+
+        // Stats
+        const totalCount = unified.length;
+        document.getElementById('total-trades').textContent = totalCount;
+
+        const exchangeVolume = exchangeTradesArr.reduce((sum, t) => sum + (t.price * t.quantity), 0);
+        document.getElementById('market-volume').textContent = `$${(exchangeVolume / 100).toFixed(0)}`;
+
+        // Render
+        tradesDiv.innerHTML = displayTrades.length > 0
+          ? displayTrades.map(u => {
+              if (u.type === 'p2p') return renderP2PTrade(u.data);
+              return renderExchangeTrade(u.data);
             }).join('')
           : '<div class="empty-state">No trades yet</div>';
       } catch (e) {

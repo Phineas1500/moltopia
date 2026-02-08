@@ -2,6 +2,9 @@ import { Hono } from 'hono';
 import { EconomyService } from '../../services/economy.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
+import { db } from '../../db/index.js';
+import { trades, agents, items } from '../../db/schema.js';
+import { eq, desc, sql } from 'drizzle-orm';
 
 const economy = new Hono();
 
@@ -239,6 +242,95 @@ economy.post('/trades', authMiddleware, verifiedMiddleware, async (c) => {
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 400);
   }
+});
+
+/**
+ * Get completed P2P trades (public)
+ */
+economy.get('/trades/public', async (c) => {
+  const limit = Math.min(parseInt(c.req.query('limit') || '20'), 50);
+
+  const fromAgent = db.select({
+    id: agents.id,
+    name: agents.name,
+    avatarEmoji: agents.avatarEmoji,
+  }).from(agents).as('from_agent');
+
+  const toAgent = db.select({
+    id: agents.id,
+    name: agents.name,
+    avatarEmoji: agents.avatarEmoji,
+  }).from(agents).as('to_agent');
+
+  const results = await db
+    .select({
+      trade: trades,
+      fromAgent: {
+        id: fromAgent.id,
+        name: fromAgent.name,
+        avatarEmoji: fromAgent.avatarEmoji,
+      },
+      toAgent: {
+        id: toAgent.id,
+        name: toAgent.name,
+        avatarEmoji: toAgent.avatarEmoji,
+      },
+    })
+    .from(trades)
+    .innerJoin(fromAgent, eq(trades.fromAgentId, fromAgent.id))
+    .innerJoin(toAgent, eq(trades.toAgentId, toAgent.id))
+    .where(eq(trades.status, 'accepted'))
+    .orderBy(desc(trades.resolvedAt))
+    .limit(limit);
+
+  // Collect all item IDs referenced in trades
+  const itemIds = new Set<string>();
+  for (const r of results) {
+    const offerItems = r.trade.offerItems as Array<{ itemId: string; quantity: number }>;
+    const requestItems = r.trade.requestItems as Array<{ itemId: string; quantity: number }>;
+    for (const i of offerItems) itemIds.add(i.itemId);
+    for (const i of requestItems) itemIds.add(i.itemId);
+  }
+
+  // Fetch item details
+  const itemMap = new Map<string, { id: string; name: string; emoji: string | null }>();
+  if (itemIds.size > 0) {
+    const itemRows = await db
+      .select({ id: items.id, name: items.name, emoji: items.emoji })
+      .from(items)
+      .where(sql`${items.id} IN (${sql.join([...itemIds].map(id => sql`${id}`), sql`, `)})`);
+    for (const item of itemRows) {
+      itemMap.set(item.id, item);
+    }
+  }
+
+  const tradeList = results.map(r => {
+    const offerItems = (r.trade.offerItems as Array<{ itemId: string; quantity: number }>).map(i => ({
+      ...i,
+      item: itemMap.get(i.itemId) || null,
+    }));
+    const requestItems = (r.trade.requestItems as Array<{ itemId: string; quantity: number }>).map(i => ({
+      ...i,
+      item: itemMap.get(i.itemId) || null,
+    }));
+
+    return {
+      id: r.trade.id,
+      fromAgent: r.fromAgent,
+      toAgent: r.toAgent,
+      offerItems,
+      offerAmountDollars: r.trade.offerAmount / 100,
+      requestItems,
+      requestAmountDollars: r.trade.requestAmount / 100,
+      message: r.trade.message,
+      resolvedAt: r.trade.resolvedAt,
+    };
+  });
+
+  return c.json({
+    success: true,
+    data: { trades: tradeList },
+  });
 });
 
 /**
