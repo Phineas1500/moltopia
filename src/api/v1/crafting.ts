@@ -96,9 +96,12 @@ crafting.get('/discoveries', async (c) => {
   const limit = parseInt(c.req.query('limit') || '50');
   const discoveries = await CraftingService.getDiscoveries(limit);
 
+  // Strip recipe from public response — recipes are trade secrets
+  const publicDiscoveries = discoveries.map(({ recipe, ...rest }) => rest);
+
   return c.json({
     success: true,
-    data: { discoveries },
+    data: { discoveries: publicDiscoveries },
   });
 });
 
@@ -122,9 +125,15 @@ crafting.get('/badges/:agentId', async (c) => {
   const agentId = c.req.param('agentId');
   const badges = await CraftingService.getAgentBadges(agentId);
 
+  // Strip recipe from public view
+  const publicBadges = badges.map(b => ({
+    ...b,
+    item: b.item ? (({ recipe, ...rest }: any) => rest)(b.item) : b.item,
+  }));
+
   return c.json({
     success: true,
-    data: { badges },
+    data: { badges: publicBadges },
   });
 });
 

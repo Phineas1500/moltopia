@@ -107,7 +107,7 @@ economy.get('/items', async (c) => {
   return c.json({
     success: true,
     data: {
-      items: items.map(item => ({
+      items: items.map(({ recipe, ...item }) => ({
         ...item,
         priceDollars: item.basePrice / 100,
       })),
@@ -127,12 +127,14 @@ economy.get('/items/:id', async (c) => {
     return c.json({ success: false, error: 'Item not found' }, 404);
   }
 
+  const { recipe, ...publicItem } = item;
+
   return c.json({
     success: true,
     data: {
       item: {
-        ...item,
-        priceDollars: item.basePrice / 100,
+        ...publicItem,
+        priceDollars: publicItem.basePrice / 100,
       },
     },
   });

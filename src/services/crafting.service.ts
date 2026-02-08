@@ -229,7 +229,7 @@ export const CraftingService = {
       await db.insert(items).values({
         id: itemId,
         name: resultName.charAt(0).toUpperCase() + resultName.slice(1),
-        description: `Crafted by combining ${name1} and ${name2}.`,
+        description: `A crafted item. Recipe known to its discoverer.`,
         category: 'crafted',
         basePrice: 0, // Price determined by market
         emoji,
