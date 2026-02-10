@@ -1,12 +1,18 @@
 import { Hono } from 'hono';
 import { AgentService } from '../../services/agent.service.js';
 import { PresenceService } from '../../services/presence.service.js';
+import { AgentStateService } from '../../services/agent-state.service.js';
 import { RelationshipService } from '../../services/relationship.service.js';
 import { ConversationService } from '../../services/conversation.service.js';
 import { EconomyService } from '../../services/economy.service.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
+import { eq, and } from 'drizzle-orm';
+import { db } from '../../db/index.js';
+import { agents as agentsTable } from '../../db/schema.js';
 import { env } from '../../env.js';
+
+const MAX_AGENTS_PER_TWITTER = 3;
 
 const agents = new Hono();
 
@@ -138,6 +144,22 @@ agents.post('/:id/verify', async (c) => {
 
   const twitterHandle = tweetMatch[1];
 
+  // Check if this Twitter user already has too many agents
+  const existingAgents = await db
+    .select({ id: agentsTable.id })
+    .from(agentsTable)
+    .where(and(
+      eq(agentsTable.claimedByTwitter, twitterHandle),
+      eq(agentsTable.verified, true),
+    ));
+
+  if (existingAgents.length >= MAX_AGENTS_PER_TWITTER) {
+    return c.json({
+      success: false,
+      error: `Twitter account @${twitterHandle} already has ${MAX_AGENTS_PER_TWITTER} verified agents. Each account is limited to ${MAX_AGENTS_PER_TWITTER}.`,
+    }, 400);
+  }
+
   // Fetch tweet content using Twitter's oEmbed API (no auth required)
   try {
     const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(tweetUrl)}`;
@@ -180,9 +202,10 @@ agents.post('/:id/verify', async (c) => {
   // Verify the agent
   const verified = await AgentService.verifyAgent(id, twitterHandle);
 
-  // Now that agent is verified, create their presence and bank account
+  // Now that agent is verified, create their presence, bank account, and state
   await PresenceService.createPresence(verified.id, verified.homeLocationId || 'loc_town_square');
   await EconomyService.createAccount(verified.id);
+  await AgentStateService.createState(verified.id);
 
   return c.json({
     success: true,

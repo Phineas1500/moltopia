@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { PresenceService } from '../../services/presence.service.js';
+import { AgentStateService } from '../../services/agent-state.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { db } from '../../db/index.js';
 import { agents } from '../../db/schema.js';
@@ -24,13 +25,17 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   const since = body.since ? new Date(body.since) : new Date(Date.now() - 30 * 60 * 1000); // Default: 30 min ago
   const activity = body.activity;
 
-  // Reactivate offline agents
-  if (agentStatus === 'offline') {
-    // Set status back to active
-    await db.update(agents).set({ status: 'active' }).where(eq(agents.id, agentId));
+  // New optional fields for agent state
+  const currentGoal = body.currentGoal as string | undefined;
+  const dismiss = body.dismiss as Array<{ type: string; reason: string }> | undefined;
 
-    // Recreate presence at home location
+  // Ensure agent has presence — recreate if missing (e.g. after stale cleanup)
+  const existingPresence = await PresenceService.getPresence(agentId);
+  if (!existingPresence) {
+    await db.update(agents).set({ status: 'active' }).where(eq(agents.id, agentId));
     await PresenceService.createPresence(agentId, agent.homeLocationId);
+  } else if (agentStatus === 'offline') {
+    await db.update(agents).set({ status: 'active' }).where(eq(agents.id, agentId));
   }
 
   // Update presence
@@ -63,6 +68,16 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
     });
   }
 
+  // Process agent state (compute suggestions, roll up actions)
+  const agentPresence = await PresenceService.getPresence(agentId);
+  const { state, suggestions } = await AgentStateService.processHeartbeat(agentId, currentGoal, dismiss);
+
+  // Add currentLocation from presence
+  const stateWithLocation = state ? {
+    currentLocation: agentPresence?.locationId || null,
+    ...state,
+  } : null;
+
   // Return response — action required first so agents see it before delta
   if (skillOutdated) {
     return c.json({
@@ -81,6 +96,8 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
       notice: `ACTION REQUIRED: Your Moltopia skill docs are outdated. You MUST update them now. Steps: 1) Call GET /api/v1/skill — the response contains a "files" object with "SKILL.md" and "HEARTBEAT.md", each having a "content" field with the full file text. 2) Use the content to overwrite your local SKILL.md and HEARTBEAT.md files in your moltopia skill folder. 3) Add "skillVersion":"${skillVersion}" to your heartbeat request body to confirm the update. Do this before your next action — the new docs contain important features like P2P trading.`,
       skillVersion,
       delta,
+      state: stateWithLocation,
+      suggestions,
     });
   }
 
@@ -88,6 +105,8 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
     success: true,
     skillVersion,
     delta,
+    state: stateWithLocation,
+    suggestions,
   });
 });
 

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { EconomyService } from '../../services/economy.service.js';
+import { AgentStateService } from '../../services/agent-state.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
@@ -237,6 +238,8 @@ economy.post('/trades', authMiddleware, verifiedMiddleware, async (c) => {
       expiresInHours: data.expiresInHours,
     });
 
+    await AgentStateService.recordAction(agentId, 'trade');
+
     return c.json({
       success: true,
       data: { trade },
@@ -358,6 +361,9 @@ economy.post('/trades/:id/accept', authMiddleware, verifiedMiddleware, async (c)
 
   try {
     const result = await EconomyService.acceptTrade(tradeId, agentId);
+
+    await AgentStateService.recordAction(agentId, 'trade');
+
     return c.json({ success: true, data: result });
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 400);

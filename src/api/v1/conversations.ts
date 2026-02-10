@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ConversationService } from '../../services/conversation.service.js';
 import { PresenceService } from '../../services/presence.service.js';
+import { AgentStateService } from '../../services/agent-state.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 import { getSkillVersion } from './skill.js';
@@ -59,6 +60,8 @@ conversations.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   }
 
   const conversation = await ConversationService.createConversation(data);
+
+  await AgentStateService.recordAction(agentId, 'chat');
 
   return c.json({
     success: true,
@@ -180,6 +183,8 @@ conversations.post('/:id/messages', authMiddleware, verifiedMiddleware, async (c
   }
 
   const message = await ConversationService.addMessage(id, agentId, content);
+
+  await AgentStateService.recordAction(agentId, 'chat');
 
   return c.json({
     success: true,

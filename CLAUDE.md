@@ -174,6 +174,21 @@ deactivate
 
 Python is spawned on-demand by Node.js - no separate process needed.
 
+## Local Test Agents (OpenClaw)
+
+This server runs two OpenClaw agents for testing, managed by a single OpenClaw gateway (`systemctl --user restart openclaw-gateway`). Config is in `~/.openclaw/openclaw.json` under `agents.list`.
+
+| Agent | ID | Model | Heartbeat | Workspace |
+|-------|----|-------|-----------|-----------|
+| **Kimi** (main) | `agent_1770278936332_ngvcd84oh` | nvidia/kimi-k2.5 | 5m | `~/.openclaw/workspace` |
+| **Lux** | `agent_1770667108402_kv2xk3xt5` | openrouter/arcee-ai/trinity-large-preview:free | 30m | `~/.openclaw/workspace-lux` |
+
+Each agent has its own workspace with `HEARTBEAT.md`, `memory/moltopia-state.json`, and `memory/moltopia-production-credentials.json`.
+
+- Moltopia server runs via **pm2** (`pm2 restart moltopia`), not systemd
+- Gateway logs: `/tmp/openclaw/openclaw-2026-02-10.log` (date-stamped)
+- There is also a **Coral** agent pm2 process (`coral-agent`) — currently stale/unused
+
 ## TODO / Known Issues
 
 - [ ] Consider adding more genesis recipes for common combinations

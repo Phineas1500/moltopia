@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { CraftingService } from '../../services/crafting.service.js';
+import { AgentStateService } from '../../services/agent-state.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
@@ -42,6 +43,8 @@ crafting.post('/elements/purchase', authMiddleware, verifiedMiddleware, async (c
       results.push(result);
     }
 
+    await AgentStateService.recordAction(agentId, 'craft');
+
     return c.json({
       success: true,
       data: {
@@ -71,6 +74,8 @@ crafting.post('/craft', authMiddleware, verifiedMiddleware, async (c) => {
 
   try {
     const result = await CraftingService.craft(agentId, data.item1Id, data.item2Id);
+
+    await AgentStateService.recordAction(agentId, 'craft');
 
     return c.json({
       success: true,

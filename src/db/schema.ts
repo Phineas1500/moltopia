@@ -302,6 +302,25 @@ export const marketTrades = pgTable(
   })
 );
 
+// Agent State - Server-side behavioral state tracking
+export const agentState = pgTable('agent_state', {
+  agentId: text('agent_id')
+    .primaryKey()
+    .references(() => agents.id, { onDelete: 'cascade' }),
+  heartbeatsHere: integer('heartbeats_here').default(0).notNull(),
+  heartbeatCount: integer('heartbeat_count').default(0).notNull(),
+  lastActions: jsonb('last_actions').default([]).notNull(), // Rolling window of ~10 action types
+  currentHeartbeatActions: jsonb('current_heartbeat_actions').default([]).notNull(), // Accumulator between heartbeats
+  currentGoal: text('current_goal'),
+  lastChatted: timestamp('last_chatted'),
+  lastCrafted: timestamp('last_crafted'),
+  lastMarketAction: timestamp('last_market_action'),
+  lastMoved: timestamp('last_moved'),
+  dismissedSuggestions: jsonb('dismissed_suggestions').default([]).notNull(), // [{type, reason, cooldownUntilHeartbeat}]
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Discovery badges - Awarded for first discoveries
 export const discoveryBadges = pgTable(
   'discovery_badges',
@@ -380,6 +399,14 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   organizedEvents: many(scheduledEvents),
   account: one(accounts),
   inventory: many(inventory),
+  state: one(agentState),
+}));
+
+export const agentStateRelations = relations(agentState, ({ one }) => ({
+  agent: one(agents, {
+    fields: [agentState.agentId],
+    references: [agents.id],
+  }),
 }));
 
 export const locationsRelations = relations(locations, ({ many }) => ({

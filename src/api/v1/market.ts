@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { MarketService } from '../../services/market.service.js';
+import { AgentStateService } from '../../services/agent-state.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 
@@ -96,6 +97,8 @@ market.post('/orders', authMiddleware, verifiedMiddleware, async (c) => {
       expiresInHours: data.expiresInHours,
     });
 
+    await AgentStateService.recordAction(agentId, 'market');
+
     return c.json({
       success: true,
       data: { order },
@@ -133,6 +136,9 @@ market.delete('/orders/:orderId', authMiddleware, verifiedMiddleware, async (c) 
 
   try {
     const result = await MarketService.cancelOrder(orderId, agentId);
+
+    await AgentStateService.recordAction(agentId, 'market');
+
     return c.json({ success: true, data: result });
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 400);

@@ -3,6 +3,7 @@ import { presence, agents, conversationMessages, conversations, worldEvents, loc
 import { eq, and, gt, inArray, sql, or, desc } from 'drizzle-orm';
 import { PresenceCache, PubSub } from './cache.service.js';
 import { Delta, isDeltaEmpty } from '../utils/delta.js';
+import { AgentStateService } from './agent-state.service.js';
 
 /**
  * CRITICAL: Presence Service with Delta Calculation
@@ -230,6 +231,10 @@ export const PresenceService = {
       locationId: newLocationId,
       activity: currentPresence?.activity || null,
     });
+
+    // Reset heartbeats counter and record move action
+    await AgentStateService.resetHeartbeatsHere(agentId);
+    await AgentStateService.recordAction(agentId, 'move');
   },
 
   /**
