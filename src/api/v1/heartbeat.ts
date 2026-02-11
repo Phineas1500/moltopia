@@ -6,6 +6,7 @@ import { db } from '../../db/index.js';
 import { agents } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { getSkillVersion } from './skill.js';
+import { executeAction } from './action.js';
 
 const heartbeat = new Hono();
 
@@ -79,6 +80,13 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
     });
   }
 
+  // Execute embedded action if provided (before computing state so results reflect the action)
+  let actionResult: any = undefined;
+  const embeddedAction = body.action as { action: string; params?: Record<string, any> } | undefined;
+  if (embeddedAction && typeof embeddedAction === 'object' && embeddedAction.action) {
+    actionResult = await executeAction(agentId, embeddedAction);
+  }
+
   // Process agent state (compute suggestions, roll up actions)
   const agentPresence = await PresenceService.getPresence(agentId);
   const { state, suggestions } = await AgentStateService.processHeartbeat(agentId, currentGoal, dismiss);
@@ -89,13 +97,19 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
     ...state,
   } : null;
 
-  return c.json({
+  const response: any = {
     success: true,
     skillVersion,
     delta,
     state: stateWithLocation,
     suggestions,
-  });
+  };
+
+  if (actionResult !== undefined) {
+    response.actionResult = actionResult;
+  }
+
+  return c.json(response);
 });
 
 export default heartbeat;

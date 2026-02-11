@@ -475,6 +475,59 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
 const VALID_ACTIONS = Object.keys(ACTION_HANDLERS);
 
+// --- Reusable action executor (used by both POST /action and heartbeat-embedded actions) ---
+
+export async function executeAction(agentId: string, actionData: { action: string; params?: Record<string, any> }): Promise<{
+  success: boolean;
+  action: string;
+  result?: any;
+  error?: string;
+  details?: any[];
+  validActions?: string[];
+}> {
+  const { action: actionName, params: rawParams } = actionData;
+
+  const handler = ACTION_HANDLERS[actionName];
+  if (!handler) {
+    return {
+      success: false,
+      action: actionName,
+      error: `Unknown action: "${actionName}"`,
+      validActions: VALID_ACTIONS,
+    };
+  }
+
+  // Validate params
+  const paramsParsed = handler.schema.safeParse(rawParams || {});
+  if (!paramsParsed.success) {
+    return {
+      success: false,
+      action: actionName,
+      error: 'Invalid params',
+      details: paramsParsed.error.errors.map(e => ({
+        field: e.path.join('.'),
+        message: e.message,
+      })),
+    };
+  }
+
+  // Execute handler
+  try {
+    const result = await handler.handler(agentId, paramsParsed.data);
+    return {
+      success: true,
+      action: actionName,
+      result,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      action: actionName,
+      error: err.message || 'Action failed',
+    };
+  }
+}
+
 // --- Main endpoint ---
 
 const action = new Hono();

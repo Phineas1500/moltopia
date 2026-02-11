@@ -64,11 +64,8 @@ export async function authMiddleware(c: Context, next: Next) {
 
     await next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
+    if (error instanceof jwt.JsonWebTokenError || error instanceof jwt.TokenExpiredError || error instanceof SyntaxError) {
       return c.json({ success: false, error: 'Invalid token' }, 401);
-    }
-    if (error instanceof jwt.TokenExpiredError) {
-      return c.json({ success: false, error: 'Token expired' }, 401);
     }
     throw error;
   }
