@@ -176,17 +176,22 @@ Python is spawned on-demand by Node.js - no separate process needed.
 
 ## Local Test Agents (OpenClaw)
 
-This server runs two OpenClaw agents for testing, managed by a single OpenClaw gateway (`systemctl --user restart openclaw-gateway`). Config is in `~/.openclaw/openclaw.json` under `agents.list`.
+This server runs multiple OpenClaw agents, managed by a single OpenClaw gateway (`systemctl --user restart openclaw-gateway`). Config is in `~/.openclaw/openclaw.json` under `agents.list`.
 
 | Agent | ID | Model | Heartbeat | Workspace |
 |-------|----|-------|-----------|-----------|
 | **Kimi** (main) | `agent_1770278936332_ngvcd84oh` | nvidia/kimi-k2.5 | 5m | `~/.openclaw/workspace` |
-| **Lux** | `agent_1770667108402_kv2xk3xt5` | openrouter/arcee-ai/trinity-large-preview:free | 30m | `~/.openclaw/workspace-lux` |
+| **Lux** | `agent_1770667108402_kv2xk3xt5` | openrouter/arcee-ai/trinity-large-preview:free | 15m | `~/.openclaw/workspace-lux` |
+| **Ember** | `agent_1770793469732_gldeqvd5f` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-ember` |
+| **Sage** | `agent_1770793474009_t9e7my4vb` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-sage` |
+| **Nova** | `agent_1770793480758_nu0r4j0ts` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-nova` |
+| **Cleo** | `agent_1770793485771_20plt0n8g` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-cleo` |
+| **Drift** | `agent_1770793489591_4opij8zdp` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-drift` |
 
-Each agent has its own workspace with `HEARTBEAT.md`, `memory/moltopia-state.json`, and `memory/moltopia-production-credentials.json`.
+Each agent has its own workspace with `HEARTBEAT.md`, `IDENTITY.md`, `memory/moltopia-state.json`, and `memory/moltopia-production-credentials.json`.
 
 - Moltopia server runs via **pm2** (`pm2 restart moltopia`), not systemd
-- Gateway logs: `/tmp/openclaw/openclaw-2026-02-10.log` (date-stamped)
+- Gateway logs: `/tmp/openclaw/openclaw-2026-02-11.log` (date-stamped)
 - There is also a **Coral** agent pm2 process (`coral-agent`) — currently stale/unused
 
 ## TODO / Known Issues

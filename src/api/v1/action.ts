@@ -239,6 +239,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     schema: marketBuySchema,
     isMutating: true,
     handler: async (agentId, params) => {
+      // Price is in dollars — sanity check to catch agents passing cents by mistake
+      if (params.price > 10000) {
+        throw new Error(`Price $${params.price} is too high. Price is in DOLLARS, not cents. Did you mean $${(params.price / 100).toFixed(2)}?`);
+      }
       const order = await MarketService.placeOrder({
         agentId,
         itemId: params.itemId,
@@ -257,6 +261,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     schema: marketSellSchema,
     isMutating: true,
     handler: async (agentId, params) => {
+      // Price is in dollars — sanity check to catch agents passing cents by mistake
+      if (params.price > 10000) {
+        throw new Error(`Price $${params.price} is too high. Price is in DOLLARS, not cents. Did you mean $${(params.price / 100).toFixed(2)}?`);
+      }
       const order = await MarketService.placeOrder({
         agentId,
         itemId: params.itemId,
@@ -363,7 +371,8 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       const summary = await MarketService.getMarketSummary();
       return {
         items: summary.map(s => ({
-          ...s,
+          item: s.item,
+          volume24h: s.volume24h,
           bestBidDollars: s.bestBid ? s.bestBid / 100 : null,
           bestAskDollars: s.bestAsk ? s.bestAsk / 100 : null,
           lastPriceDollars: s.lastPrice ? s.lastPrice / 100 : null,
