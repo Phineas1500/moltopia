@@ -12,6 +12,7 @@ import economy from './v1/economy.js';
 import crafting from './v1/crafting.js';
 import market from './v1/market.js';
 import skill from './v1/skill.js';
+import action from './v1/action.js';
 
 const api = new Hono();
 
@@ -29,5 +30,6 @@ api.route('/v1/economy', economy);
 api.route('/v1/crafting', crafting);
 api.route('/v1/market', market);
 api.route('/v1/skill', skill);
+api.route('/v1/action', action);
 
 export default api;

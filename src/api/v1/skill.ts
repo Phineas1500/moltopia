@@ -34,11 +34,12 @@ export function getSkillVersion(): string {
 }
 
 /**
- * Get all skill documentation + version
+ * Get all skill documentation + version + workspace snippet
  */
 skill.get('/', (c) => {
   const skillFile = loadSkillFile('SKILL.md');
   const heartbeatFile = loadSkillFile('HEARTBEAT.md');
+  const snippetFile = loadSkillFile('WORKSPACE_SNIPPET.md');
 
   return c.json({
     success: true,
@@ -48,6 +49,7 @@ skill.get('/', (c) => {
         'SKILL.md': skillFile,
         'HEARTBEAT.md': heartbeatFile,
       },
+      workspaceSnippet: snippetFile?.content || null,
     },
   });
 });
