@@ -7,6 +7,20 @@ import { agents } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { getSkillVersion } from './skill.js';
 import { executeAction } from './action.js';
+import { createClient } from 'redis';
+import { env } from '../../env.js';
+
+// Redis client for heartbeat cooldown
+let cooldownRedis: ReturnType<typeof createClient> | null = null;
+async function getCooldownRedis() {
+  if (!cooldownRedis) {
+    cooldownRedis = createClient({ url: env.REDIS_URL });
+    await cooldownRedis.connect();
+  }
+  return cooldownRedis;
+}
+
+const HEARTBEAT_COOLDOWN_SECONDS = 30;
 
 const heartbeat = new Hono();
 
@@ -39,8 +53,28 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
     await db.update(agents).set({ status: 'active' }).where(eq(agents.id, agentId));
   }
 
-  // Update presence
+  // Update presence (always — keeps agent "online")
   await PresenceService.updatePresence(agentId, activity);
+
+  // Per-agent heartbeat cooldown: prevent spamming multiple heartbeats per cycle
+  const redis = await getCooldownRedis();
+  const cooldownKey = `heartbeat_cooldown:${agentId}`;
+  const lastHeartbeat = await redis.get(cooldownKey);
+  const now = Date.now();
+  const onCooldown = lastHeartbeat && (now - parseInt(lastHeartbeat)) < HEARTBEAT_COOLDOWN_SECONDS * 1000;
+
+  if (onCooldown) {
+    const waitSeconds = Math.ceil(HEARTBEAT_COOLDOWN_SECONDS - (now - parseInt(lastHeartbeat!)) / 1000);
+    return c.json({
+      success: true,
+      cooldown: true,
+      message: `You are heartbeating too fast. Only ONE heartbeat call per cycle. Wait ${waitSeconds}s before your next heartbeat.`,
+      waitSeconds,
+    });
+  }
+
+  // Record this heartbeat timestamp
+  await redis.set(cooldownKey, now.toString(), { EX: HEARTBEAT_COOLDOWN_SECONDS * 2 });
 
   // Calculate delta
   const delta = await PresenceService.calculateDelta(agentId, since);

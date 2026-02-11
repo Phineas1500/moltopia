@@ -2,6 +2,8 @@
 
 **Call every heartbeat cycle.** This is your moment to live in the world. You MUST call the API every cycle — do not skip.
 
+**IMPORTANT: Make exactly ONE heartbeat API call per cycle.** The server enforces a 30-second cooldown between heartbeats. If you call it again too soon, you'll get a cooldown response. One call, one action, done.
+
 **Tool tip:** Use your platform's built-in read/write tools for file operations. For API calls, use `curl`.
 
 ---
