@@ -9,6 +9,7 @@ import { EconomyService } from '../../services/economy.service.js';
 import { AgentStateService } from '../../services/agent-state.service.js';
 import { AgentService } from '../../services/agent.service.js';
 import { LocationService } from '../../services/location.service.js';
+import { BountyService } from '../../services/bounty.service.js';
 import { db } from '../../db/index.js';
 import { presence, inventory, accounts, agentState, agents } from '../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
@@ -71,6 +72,21 @@ const tradeAcceptSchema = z.object({
 
 const tradeRejectSchema = z.object({
   tradeId: z.string(),
+});
+
+const postBountySchema = z.object({
+  itemId: z.string(),
+  reward: z.number().positive(),
+  quantity: z.number().int().positive().optional(),
+  message: z.string().max(500).optional(),
+});
+
+const fulfillBountySchema = z.object({
+  bountyId: z.string(),
+});
+
+const cancelBountySchema = z.object({
+  bountyId: z.string(),
 });
 
 const checkConversationsSchema = z.object({
@@ -332,6 +348,62 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     },
   },
 
+  post_bounty: {
+    schema: postBountySchema,
+    isMutating: true,
+    handler: async (agentId, params) => {
+      // Reward is in dollars — sanity check
+      if (params.reward > 10000) {
+        throw new Error(`Reward $${params.reward} is too high. Reward is in DOLLARS, not cents. Did you mean $${(params.reward / 100).toFixed(2)}?`);
+      }
+      const bounty = await BountyService.postBounty({
+        creatorId: agentId,
+        itemId: params.itemId,
+        rewardDollars: params.reward,
+        quantity: params.quantity,
+        message: params.message,
+      });
+
+      await AgentStateService.recordAction(agentId, 'bounty');
+
+      return {
+        bounty: {
+          ...bounty,
+          rewardDollars: bounty.reward / 100,
+        },
+      };
+    },
+  },
+
+  fulfill_bounty: {
+    schema: fulfillBountySchema,
+    isMutating: true,
+    handler: async (agentId, params) => {
+      const result = await BountyService.fulfillBounty(params.bountyId, agentId);
+
+      await AgentStateService.recordAction(agentId, 'bounty');
+
+      return {
+        bounty: {
+          ...result,
+          rewardDollars: result.reward / 100,
+        },
+      };
+    },
+  },
+
+  cancel_bounty: {
+    schema: cancelBountySchema,
+    isMutating: true,
+    handler: async (agentId, params) => {
+      const result = await BountyService.cancelBounty(params.bountyId, agentId);
+
+      await AgentStateService.recordAction(agentId, 'bounty');
+
+      return result;
+    },
+  },
+
   // ============ INFO ACTIONS (read-only) ============
 
   check_inventory: {
@@ -411,6 +483,25 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     handler: async (agentId) => {
       const trades = await EconomyService.getPendingTrades(agentId);
       return { trades };
+    },
+  },
+
+  check_bounties: {
+    schema: z.object({}),
+    isMutating: false,
+    handler: async () => {
+      const openBounties = await BountyService.getOpenBounties();
+      return {
+        bounties: openBounties.map(b => ({
+          id: b.id,
+          item: b.item,
+          rewardDollars: b.reward / 100,
+          quantity: b.quantity,
+          creator: b.creator,
+          message: b.message,
+          expiresAt: b.expiresAt,
+        })),
+      };
     },
   },
 

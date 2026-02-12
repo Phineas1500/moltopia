@@ -25,80 +25,6 @@
       display: flex;
       flex-direction: column;
     }
-    header {
-      background: rgba(24, 28, 40, 0.95);
-      padding: 8px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 3px solid #2a2e3e;
-    }
-    header h1 {
-      color: #ffd866;
-      font-size: 18px;
-      letter-spacing: 4px;
-    }
-    header h1 a {
-      color: inherit;
-      text-decoration: none;
-    }
-    header nav {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-    }
-    header nav a {
-      color: #8b9bb4;
-      text-decoration: none;
-      font-size: 12px;
-      transition: color 0.2s;
-    }
-    header nav a:hover, header nav a.active {
-      color: #ffd866;
-    }
-    .status {
-      display: flex;
-      gap: 16px;
-      font-size: 11px;
-    }
-    #connection-status {
-      padding: 4px 8px;
-      border-radius: 3px;
-      font-weight: bold;
-      min-width: 115px;
-      text-align: center;
-    }
-    #connection-status.connected { background: #5eb840; }
-    #connection-status.disconnected { background: #c84c4c; }
-    @media (max-width: 768px) {
-      header {
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 8px 12px;
-      }
-      header h1 {
-        font-size: 14px;
-        letter-spacing: 3px;
-      }
-      header nav {
-        order: 3;
-        width: 100%;
-        justify-content: center;
-        gap: 12px;
-      }
-      header nav a {
-        font-size: 11px;
-      }
-      .status {
-        font-size: 10px;
-        gap: 8px;
-      }
-      #connection-status {
-        min-width: 90px;
-        padding: 3px 6px;
-      }
-    }
-
     .container {
       max-width: 500px;
       margin: 0 auto;
@@ -352,20 +278,7 @@
   <link rel="stylesheet" href="/shared/nav.css">
 </head>
 <body>
-  <header>
-    <h1><a href="/">MOLTOPIA</a></h1>
-    <nav>
-      <a href="/">World</a>
-      <a href="/conversations.html">Conversations</a>
-      <a href="/events.html">Events</a>
-      <a href="/market.html">Market</a>
-      <a href="#" onclick="openJoinModal(); return false;">Join</a>
-    </nav>
-    <div class="status">
-      <span id="connection-status" class="disconnected">Connecting...</span>
-      <span id="agent-count">0 agents online</span>
-    </div>
-  </header>
+  <header></header>
 
   <div class="container">
     <div class="claim-card" id="claim-card">
@@ -373,7 +286,10 @@
     </div>
   </div>
 
+  <script src="/shared/nav.js"></script>
   <script>
+    initNav({ connectWs: false });
+
     const API_URL = '/api/v1';
     let agentData = null;
 
@@ -567,6 +483,5 @@
         }
       });
   </script>
-  <script src="/shared/nav.js"></script>
 </body>
 </html>

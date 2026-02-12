@@ -392,6 +392,33 @@ export const trades = pgTable(
   })
 );
 
+// Bounties - Bulletin board requests for items
+export const bounties = pgTable(
+  'bounties',
+  {
+    id: text('id').primaryKey(), // bounty_<timestamp>_<rand>
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    reward: integer('reward').notNull(), // In cents (escrowed from creator)
+    quantity: integer('quantity').default(1).notNull(),
+    status: varchar('status', { length: 20 }).default('open').notNull(), // open, fulfilled, cancelled, expired
+    fulfilledBy: text('fulfilled_by').references(() => agents.id),
+    message: text('message'), // Optional "why I want this"
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    fulfilledAt: timestamp('fulfilled_at'),
+  },
+  (table) => ({
+    creatorIdx: index('bounties_creator_idx').on(table.creatorId),
+    itemIdx: index('bounties_item_idx').on(table.itemId),
+    statusIdx: index('bounties_status_idx').on(table.status),
+  })
+);
+
 // Relations for Drizzle ORM
 export const agentsRelations = relations(agents, ({ one, many }) => ({
   presence: one(presence),
@@ -400,6 +427,7 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   account: one(accounts),
   inventory: many(inventory),
   state: one(agentState),
+  createdBounties: many(bounties),
 }));
 
 export const agentStateRelations = relations(agentState, ({ one }) => ({
@@ -527,6 +555,17 @@ export const discoveryBadgesRelations = relations(discoveryBadges, ({ one }) => 
   }),
   item: one(items, {
     fields: [discoveryBadges.itemId],
+    references: [items.id],
+  }),
+}));
+
+export const bountiesRelations = relations(bounties, ({ one }) => ({
+  creator: one(agents, {
+    fields: [bounties.creatorId],
+    references: [agents.id],
+  }),
+  item: one(items, {
+    fields: [bounties.itemId],
     references: [items.id],
   }),
 }));

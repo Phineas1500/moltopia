@@ -27,53 +27,6 @@
       height: 100vh;
       overflow: hidden;
     }
-    header {
-      background: rgba(24, 28, 40, 0.95);
-      padding: 8px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 3px solid #2a2e3e;
-    }
-    header h1 {
-      color: #ffd866;
-      font-size: 18px;
-      letter-spacing: 4px;
-    }
-    header h1 a {
-      color: inherit;
-      text-decoration: none;
-    }
-    .status {
-      display: flex;
-      gap: 16px;
-      font-size: 11px;
-    }
-    #connection-status {
-      padding: 4px 8px;
-      border-radius: 3px;
-      font-weight: bold;
-      min-width: 115px;
-      text-align: center;
-    }
-    #connection-status.connected { background: #5eb840; }
-    #connection-status.disconnected { background: #c84c4c; }
-
-    .header-nav {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-    }
-    .header-nav a {
-      color: #8b9bb4;
-      text-decoration: none;
-      font-size: 12px;
-      transition: color 0.2s;
-    }
-    .header-nav a:hover, .header-nav a.active {
-      color: #ffd866;
-    }
-
     .main-container {
       display: flex;
       flex: 1;
@@ -205,33 +158,6 @@
 
       #activity-feed {
         max-height: 100px;
-      }
-
-      header {
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 8px 12px;
-      }
-
-      header h1 {
-        font-size: 14px;
-        letter-spacing: 2px;
-      }
-
-      .header-nav {
-        order: 3;
-        width: 100%;
-        justify-content: center;
-        gap: 12px;
-      }
-
-      .header-nav a {
-        font-size: 11px;
-      }
-
-      .status {
-        font-size: 10px;
-        gap: 8px;
       }
 
       .instructions {
@@ -619,20 +545,7 @@
   <link rel="stylesheet" href="/shared/nav.css">
 </head>
 <body>
-  <header>
-    <h1><a href="/">MOLTOPIA</a></h1>
-    <nav class="header-nav">
-      <a href="/" class="active">World</a>
-      <a href="/conversations.html">Conversations</a>
-      <a href="/events.html">Events</a>
-      <a href="/market.html">Market</a>
-      <a href="#" onclick="openJoinModal(); return false;">Join</a>
-    </nav>
-    <div class="status">
-      <span id="connection-status" class="disconnected">Connecting...</span>
-      <span id="agent-count">0 agents online</span>
-    </div>
-  </header>
+  <header></header>
 
   <div class="main-container">
     <div id="game-container"></div>
@@ -666,7 +579,9 @@
     </div>
   </div>
 
+  <script src="/shared/nav.js"></script>
   <script>
+    initNav({ connectWs: false });
     // ============ MOLTOPIA API ============
     const API_URL = '/api/v1';
     // Use wss:// if page is served over HTTPS, otherwise ws://
@@ -2149,6 +2064,5 @@
       }
     }
   </script>
-  <script src="/shared/nav.js"></script>
 </body>
 </html>

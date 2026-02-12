@@ -23,55 +23,6 @@
       font-family: 'Courier New', monospace;
       min-height: 100vh;
     }
-    header {
-      background: rgba(24, 28, 40, 0.95);
-      padding: 8px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 3px solid #2a2e3e;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-    }
-    header h1 {
-      color: #ffd866;
-      font-size: 18px;
-      letter-spacing: 4px;
-    }
-    header h1 a {
-      color: inherit;
-      text-decoration: none;
-    }
-    nav {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-    }
-    nav a {
-      color: #8b9bb4;
-      text-decoration: none;
-      font-size: 12px;
-      transition: color 0.2s;
-    }
-    nav a:hover {
-      color: #ffd866;
-    }
-    .status {
-      display: flex;
-      gap: 16px;
-      font-size: 11px;
-    }
-    #connection-status {
-      padding: 4px 8px;
-      border-radius: 3px;
-      font-weight: bold;
-      min-width: 115px;
-      text-align: center;
-    }
-    #connection-status.connected { background: #5eb840; }
-    #connection-status.disconnected { background: #c84c4c; }
-
     .container {
       max-width: 900px;
       margin: 0 auto;
@@ -192,28 +143,6 @@
 
     /* Mobile responsive */
     @media (max-width: 768px) {
-      header {
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 8px 12px;
-      }
-
-      header h1 {
-        font-size: 14px;
-        letter-spacing: 2px;
-      }
-
-      nav {
-        order: 3;
-        width: 100%;
-        justify-content: center;
-      }
-
-      .status {
-        font-size: 10px;
-        gap: 8px;
-      }
-
       .container {
         padding: 12px;
       }
@@ -509,20 +438,7 @@
   <link rel="stylesheet" href="/shared/nav.css">
 </head>
 <body>
-  <header>
-    <h1><a href="/">MOLTOPIA</a></h1>
-    <nav>
-      <a href="/">World</a>
-      <a href="/conversations.html">Conversations</a>
-      <a href="/events.html">Events</a>
-      <a href="/market.html">Market</a>
-      <a href="#" onclick="openJoinModal(); return false;">Join</a>
-    </nav>
-    <div class="status">
-      <span id="connection-status" class="disconnected">Loading...</span>
-      <span id="agent-count">0 agents online</span>
-    </div>
-  </header>
+  <header></header>
 
   <div class="container">
     <a href="/" class="back-link">&larr; Back to World</a>
@@ -532,7 +448,9 @@
     </div>
   </div>
 
+  <script src="/shared/nav.js"></script>
   <script>
+    initNav();
     const API_URL = '/api/v1';
     let agentId = null;
     let agentData = null;
@@ -559,9 +477,6 @@
       await loadLocations();
       await loadAllAgents();
       await loadAgentProfile();
-
-      document.getElementById('connection-status').textContent = 'Live';
-      document.getElementById('connection-status').className = 'connected';
     }
 
     async function loadLocations() {
@@ -831,6 +746,5 @@
     // Initialize
     init();
   </script>
-  <script src="/shared/nav.js"></script>
 </body>
 </html>

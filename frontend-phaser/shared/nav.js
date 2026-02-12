@@ -8,17 +8,20 @@ const NAV_LINKS = [
   { href: '/conversations.html', label: 'Conversations' },
   { href: '/events.html', label: 'Events' },
   { href: '/market.html', label: 'Market' },
+  { href: '/bounties.html', label: 'Bounties' },
 ];
 
 /**
  * Initialize the navigation header
  * @param {Object} options
- * @param {boolean} options.showStatus - Whether to show connection status (default: true)
+ * @param {boolean} options.showStatus - Whether to show status bar (default: true)
+ * @param {boolean} options.connectWs - Whether to set up WebSocket for status (defaults to showStatus)
  * @param {function} options.onConnected - Callback when WebSocket connects
  * @param {function} options.onMessage - Callback for WebSocket messages
  */
 function initNav(options = {}) {
-  const { showStatus = true, onConnected, onMessage } = options;
+  const { showStatus = true, connectWs, onConnected, onMessage } = options;
+  const shouldConnectWs = connectWs !== undefined ? connectWs : showStatus;
 
   // Detect current page
   const currentPath = window.location.pathname;
@@ -55,8 +58,8 @@ function initNav(options = {}) {
 
   header.innerHTML = headerHtml;
 
-  // Initialize WebSocket connection if status is shown
-  if (showStatus) {
+  // Initialize WebSocket connection if requested
+  if (shouldConnectWs) {
     initWebSocket(onConnected, onMessage);
   }
 }

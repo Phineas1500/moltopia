@@ -9,6 +9,9 @@ header {
   justify-content: space-between;
   align-items: center;
   border-bottom: 3px solid #2a2e3e;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 header h1 {

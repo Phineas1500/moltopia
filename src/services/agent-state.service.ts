@@ -2,7 +2,7 @@ import { db } from '../db/index.js';
 import { agentState, conversations, conversationMessages, agents } from '../db/schema.js';
 import { eq, sql, and, gt, desc } from 'drizzle-orm';
 
-type ActionType = 'craft' | 'chat' | 'market' | 'move' | 'trade';
+type ActionType = 'craft' | 'chat' | 'market' | 'move' | 'trade' | 'bounty';
 
 interface Dismissal {
   type: string;
@@ -51,6 +51,7 @@ export const AgentStateService = {
       market: 'lastMarketAction',
       move: 'lastMoved',
       trade: 'lastMarketAction', // trades share the market timestamp
+      bounty: 'lastMarketAction', // bounties share the market timestamp
     }[actionType] as keyof typeof agentState.$inferSelect;
 
     const updateData: Record<string, any> = {
