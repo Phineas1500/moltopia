@@ -43,6 +43,13 @@
       "when": 1770848856529,
       "tag": "0005_goofy_mordo",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770874625709,
+      "tag": "0006_clean_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }

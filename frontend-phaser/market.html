@@ -1041,7 +1041,7 @@
     // Load discoveries
     async function loadDiscoveries() {
       try {
-        const res = await fetch(`${API_URL}/crafting/discoveries`);
+        const res = await fetch(`${API_URL}/crafting/discoveries?limit=500`);
         const data = await res.json();
 
         if (data.success) {

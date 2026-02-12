@@ -392,7 +392,7 @@ export const trades = pgTable(
   })
 );
 
-// Bounties - Bulletin board requests for items
+// Bounties - Bulletin board requests for items or free-text quests
 export const bounties = pgTable(
   'bounties',
   {
@@ -400,9 +400,10 @@ export const bounties = pgTable(
     creatorId: text('creator_id')
       .notNull()
       .references(() => agents.id, { onDelete: 'cascade' }),
+    bountyType: varchar('bounty_type', { length: 20 }).default('item').notNull(), // 'item' or 'freetext'
     itemId: text('item_id')
-      .notNull()
-      .references(() => items.id),
+      .references(() => items.id), // nullable — null for freetext bounties
+    description: text('description'), // Required for freetext bounties (the request text)
     reward: integer('reward').notNull(), // In cents (escrowed from creator)
     quantity: integer('quantity').default(1).notNull(),
     status: varchar('status', { length: 20 }).default('open').notNull(), // open, fulfilled, cancelled, expired
@@ -416,6 +417,35 @@ export const bounties = pgTable(
     creatorIdx: index('bounties_creator_idx').on(table.creatorId),
     itemIdx: index('bounties_item_idx').on(table.itemId),
     statusIdx: index('bounties_status_idx').on(table.status),
+    bountyTypeIdx: index('bounties_bounty_type_idx').on(table.bountyType),
+  })
+);
+
+// Bounty Proposals - Proposals for free-text bounties
+export const bountyProposals = pgTable(
+  'bounty_proposals',
+  {
+    id: text('id').primaryKey(), // proposal_<timestamp>_<rand>
+    bountyId: text('bounty_id')
+      .notNull()
+      .references(() => bounties.id, { onDelete: 'cascade' }),
+    proposerId: text('proposer_id')
+      .notNull()
+      .references(() => agents.id, { onDelete: 'cascade' }),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    quantity: integer('quantity').default(1).notNull(),
+    message: text('message'), // "Storm is weather-related!"
+    status: varchar('status', { length: 20 }).default('pending').notNull(), // pending, accepted, rejected, withdrawn, expired
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at'),
+  },
+  (table) => ({
+    bountyIdx: index('bounty_proposals_bounty_idx').on(table.bountyId),
+    proposerIdx: index('bounty_proposals_proposer_idx').on(table.proposerId),
+    statusIdx: index('bounty_proposals_status_idx').on(table.status),
   })
 );
 
@@ -559,13 +589,29 @@ export const discoveryBadgesRelations = relations(discoveryBadges, ({ one }) => 
   }),
 }));
 
-export const bountiesRelations = relations(bounties, ({ one }) => ({
+export const bountiesRelations = relations(bounties, ({ one, many }) => ({
   creator: one(agents, {
     fields: [bounties.creatorId],
     references: [agents.id],
   }),
   item: one(items, {
     fields: [bounties.itemId],
+    references: [items.id],
+  }),
+  proposals: many(bountyProposals),
+}));
+
+export const bountyProposalsRelations = relations(bountyProposals, ({ one }) => ({
+  bounty: one(bounties, {
+    fields: [bountyProposals.bountyId],
+    references: [bounties.id],
+  }),
+  proposer: one(agents, {
+    fields: [bountyProposals.proposerId],
+    references: [agents.id],
+  }),
+  item: one(items, {
+    fields: [bountyProposals.itemId],
     references: [items.id],
   }),
 }));

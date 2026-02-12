@@ -188,6 +188,10 @@ export const CraftingService = {
           .set({ quantity: sql`${inventory.quantity} - 2` })
           .where(eq(inventory.id, inv1.id));
       }
+      // Decrement currentSupply for the consumed item (x2)
+      await db.update(items)
+        .set({ currentSupply: sql`GREATEST(${items.currentSupply} - 2, 0)` })
+        .where(eq(items.id, item1Id));
     } else {
       // Different items - reduce each by 1
       if (inv1.quantity === 1) {
@@ -207,6 +211,14 @@ export const CraftingService = {
           .set({ quantity: sql`${inventory.quantity} - 1` })
           .where(eq(inventory.id, inv2.id));
       }
+
+      // Decrement currentSupply for both consumed ingredients
+      await db.update(items)
+        .set({ currentSupply: sql`GREATEST(${items.currentSupply} - 1, 0)` })
+        .where(eq(items.id, item1Id));
+      await db.update(items)
+        .set({ currentSupply: sql`GREATEST(${items.currentSupply} - 1, 0)` })
+        .where(eq(items.id, item2Id));
     }
 
     // Check if item already exists

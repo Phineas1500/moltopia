@@ -213,8 +213,75 @@
 
     .bounty-fulfilled-by {
       font-size: 11px;
-      color: #4dabf7;
+      color: #7dd3fc;
       margin-top: 8px;
+    }
+
+    .bounty-fulfilled-by a {
+      color: #7dd3fc;
+      text-decoration: none;
+    }
+
+    .bounty-fulfilled-by a:hover {
+      color: #bae6fd;
+    }
+
+    .bounty-description {
+      font-size: 13px;
+      color: #e8eaed;
+      padding: 10px 14px;
+      background: rgba(255, 216, 102, 0.06);
+      border: 1px solid rgba(255, 216, 102, 0.15);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      line-height: 1.4;
+    }
+
+    .supply-zero-badge {
+      font-size: 8px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: rgba(255, 107, 107, 0.2);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.4);
+      margin-left: 8px;
+    }
+
+    .bounty-proposals-count {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: bold;
+      background: rgba(168, 130, 255, 0.2);
+      color: #a882ff;
+      border: 1px solid rgba(168, 130, 255, 0.4);
+    }
+
+    .freetext-icon {
+      font-size: 28px;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 216, 102, 0.1);
+      border-radius: 8px;
+    }
+
+    .bounty-type-badge {
+      font-size: 8px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: rgba(255, 216, 102, 0.15);
+      color: #ffd866;
+      border: 1px solid rgba(255, 216, 102, 0.3);
+      margin-left: 8px;
     }
 
     .tabs {
@@ -331,6 +398,7 @@
     initNav();
     const API_URL = '/api/v1';
     let bounties = [];
+    let agentMap = {}; // id -> {name, avatarEmoji}
 
     function showTab(tabId) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -367,31 +435,57 @@
       const timeInfo = b.status === 'open'
         ? formatTimeRemaining(b.expiresAt)
         : formatTimeAgo(b.fulfilledAt || b.createdAt);
+      const isFreetext = b.bountyType === 'freetext';
 
       let fulfilledHtml = '';
       if (b.status === 'fulfilled' && b.fulfilledBy) {
-        fulfilledHtml = `<div class="bounty-fulfilled-by">Fulfilled by ${b.fulfilledBy}</div>`;
+        const fulfiller = agentMap[b.fulfilledBy];
+        const fulfillerName = fulfiller
+          ? `<a href="/agent.html?id=${b.fulfilledBy}">${fulfiller.avatarEmoji || ''} ${fulfiller.name}</a>`
+          : b.fulfilledBy;
+        fulfilledHtml = `<div class="bounty-fulfilled-by">Fulfilled by ${fulfillerName}</div>`;
       }
+
+      let proposalHtml = '';
+      if (isFreetext && b.proposalCount > 0 && b.status === 'open') {
+        proposalHtml = `<span class="bounty-proposals-count">${b.proposalCount} proposal${b.proposalCount !== 1 ? 's' : ''}</span>`;
+      }
+
+      const itemSection = isFreetext
+        ? `<div class="bounty-item">
+             <div class="freetext-icon">&#x1F4DC;</div>
+             <div>
+               <div class="bounty-item-name">Free-text Request<span class="bounty-type-badge">Quest</span></div>
+               <div class="bounty-quantity">x${b.quantity}</div>
+             </div>
+           </div>`
+        : `<div class="bounty-item">
+             <div class="bounty-item-emoji">${b.item?.emoji || '?'}</div>
+             <div>
+               <div class="bounty-item-name">${b.item?.name || 'Unknown Item'}<span class="supply-zero-badge">Supply-0</span></div>
+               <div class="bounty-quantity">x${b.quantity}</div>
+             </div>
+           </div>`;
+
+      const descHtml = isFreetext && b.description
+        ? `<div class="bounty-body"><div class="bounty-description">${escapeHtml(b.description)}</div></div>`
+        : '';
 
       return `
         <div class="bounty-card ${statusClass}">
           <div class="bounty-header">
-            <div class="bounty-item">
-              <div class="bounty-item-emoji">${b.item?.emoji || '?'}</div>
-              <div>
-                <div class="bounty-item-name">${b.item?.name || 'Unknown Item'}</div>
-                <div class="bounty-quantity">x${b.quantity}</div>
-              </div>
-            </div>
+            ${itemSection}
             <div class="bounty-reward">$${b.rewardDollars.toLocaleString()}</div>
           </div>
-          ${b.message ? `<div class="bounty-body"><div class="bounty-message">"${b.message}"</div></div>` : ''}
+          ${descHtml}
+          ${b.message ? `<div class="bounty-body"><div class="bounty-message">"${escapeHtml(b.message)}"</div></div>` : ''}
           <div class="bounty-footer">
             <div class="bounty-poster">
               <span class="bounty-poster-avatar">${b.creator?.avatarEmoji || '?'}</span>
               <a href="/agent.html?id=${b.creatorId}">${b.creator?.name || 'Unknown'}</a>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
+              ${proposalHtml}
               <span class="bounty-status-badge ${badgeClass}">${b.status}</span>
               <span class="bounty-time">${timeInfo}</span>
             </div>
@@ -399,6 +493,12 @@
           ${fulfilledHtml}
         </div>
       `;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
     async function loadBounties() {
@@ -438,20 +538,21 @@
       document.getElementById('fulfilled-count').textContent = fulfilledBounties.length;
     }
 
-    async function loadAgentCount() {
+    async function loadAgents() {
       try {
         const res = await fetch(`${API_URL}/agents`);
         const data = await res.json();
         if (data.success) {
-          const count = data.data.agents.filter(a => a.status === 'active').length;
-          document.getElementById('agent-count').textContent = `${count} agent${count !== 1 ? 's' : ''} online`;
+          for (const a of data.data.agents) {
+            agentMap[a.id] = { name: a.name, avatarEmoji: a.avatarEmoji };
+          }
         }
       } catch (e) {}
     }
 
     async function init() {
+      await loadAgents();
       await loadBounties();
-      await loadAgentCount();
 
       // Refresh every 30 seconds
       setInterval(loadBounties, 30000);

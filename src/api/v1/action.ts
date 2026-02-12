@@ -75,10 +75,34 @@ const tradeRejectSchema = z.object({
 });
 
 const postBountySchema = z.object({
-  itemId: z.string(),
+  bountyType: z.enum(['item', 'freetext']).optional().default('item'),
+  itemId: z.string().optional(),
+  description: z.string().max(500).optional(),
   reward: z.number().positive(),
   quantity: z.number().int().positive().optional(),
   message: z.string().max(500).optional(),
+}).refine(
+  (data) => {
+    if (data.bountyType === 'item') return !!data.itemId;
+    if (data.bountyType === 'freetext') return !!data.description;
+    return true;
+  },
+  { message: 'Item bounties require itemId; free-text bounties require description' }
+);
+
+const proposeBountySchema = z.object({
+  bountyId: z.string(),
+  itemId: z.string(),
+  quantity: z.number().int().positive().optional(),
+  message: z.string().max(500).optional(),
+});
+
+const acceptProposalSchema = z.object({
+  proposalId: z.string(),
+});
+
+const rejectProposalSchema = z.object({
+  proposalId: z.string(),
 });
 
 const fulfillBountySchema = z.object({
@@ -358,7 +382,9 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       }
       const bounty = await BountyService.postBounty({
         creatorId: agentId,
+        bountyType: params.bountyType,
         itemId: params.itemId,
+        description: params.description,
         rewardDollars: params.reward,
         quantity: params.quantity,
         message: params.message,
@@ -372,6 +398,45 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
           rewardDollars: bounty.reward / 100,
         },
       };
+    },
+  },
+
+  propose_bounty: {
+    schema: proposeBountySchema,
+    isMutating: true,
+    handler: async (agentId, params) => {
+      const proposal = await BountyService.proposeBounty({
+        bountyId: params.bountyId,
+        proposerId: agentId,
+        itemId: params.itemId,
+        quantity: params.quantity,
+        message: params.message,
+      });
+
+      await AgentStateService.recordAction(agentId, 'bounty');
+
+      return { proposal };
+    },
+  },
+
+  accept_proposal: {
+    schema: acceptProposalSchema,
+    isMutating: true,
+    handler: async (agentId, params) => {
+      const result = await BountyService.acceptProposal(params.proposalId, agentId);
+
+      await AgentStateService.recordAction(agentId, 'bounty');
+
+      return result;
+    },
+  },
+
+  reject_proposal: {
+    schema: rejectProposalSchema,
+    isMutating: false,
+    handler: async (agentId, params) => {
+      const result = await BountyService.rejectProposal(params.proposalId, agentId);
+      return result;
     },
   },
 
@@ -494,14 +559,25 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       return {
         bounties: openBounties.map(b => ({
           id: b.id,
+          bountyType: b.bountyType,
           item: b.item,
+          description: b.description,
           rewardDollars: b.reward / 100,
           quantity: b.quantity,
           creator: b.creator,
           message: b.message,
+          proposalCount: b.proposalCount,
           expiresAt: b.expiresAt,
         })),
       };
+    },
+  },
+
+  check_proposals: {
+    schema: z.object({}),
+    isMutating: false,
+    handler: async (agentId) => {
+      return BountyService.getProposalsForAgent(agentId);
     },
   },
 
