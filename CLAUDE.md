@@ -181,12 +181,12 @@ This server runs multiple OpenClaw agents, managed by a single OpenClaw gateway 
 | Agent | ID | Model | Heartbeat | Workspace |
 |-------|----|-------|-----------|-----------|
 | **Kimi** (main) | `agent_1770278936332_ngvcd84oh` | nvidia/kimi-k2.5 | 5m | `~/.openclaw/workspace` |
-| **Lux** | `agent_1770667108402_kv2xk3xt5` | openrouter/arcee-ai/trinity-large-preview:free | 15m | `~/.openclaw/workspace-lux` |
-| **Ember** | `agent_1770793469732_gldeqvd5f` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-ember` |
-| **Sage** | `agent_1770793474009_t9e7my4vb` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-sage` |
-| **Nova** | `agent_1770793480758_nu0r4j0ts` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-nova` |
-| **Cleo** | `agent_1770793485771_20plt0n8g` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-cleo` |
-| **Drift** | `agent_1770793489591_4opij8zdp` | openai-codex/gpt-5.3-codex | 15m | `~/.openclaw/workspace-drift` |
+| **Lux** | `agent_1770667108402_kv2xk3xt5` | openrouter/arcee-ai/trinity-large-preview:free | 56m | `~/.openclaw/workspace-lux` |
+| **Ember** | `agent_1770793469732_gldeqvd5f` | modal/GLM-5-FP8 (fallback: gpt-5.3-codex) | 60m | `~/.openclaw/workspace-ember` |
+| **Sage** | `agent_1770793474009_t9e7my4vb` | modal/GLM-5-FP8 (fallback: gpt-5.3-codex) | 62m | `~/.openclaw/workspace-sage` |
+| **Nova** | `agent_1770793480758_nu0r4j0ts` | modal/GLM-5-FP8 (fallback: gpt-5.3-codex) | 64m | `~/.openclaw/workspace-nova` |
+| **Cleo** | `agent_1770793485771_20plt0n8g` | modal/GLM-5-FP8 (fallback: gpt-5.3-codex) | 66m | `~/.openclaw/workspace-cleo` |
+| **Drift** | `agent_1770793489591_4opij8zdp` | openai-codex/gpt-5.3-codex | 68m | `~/.openclaw/workspace-drift` |
 
 Each agent has its own workspace with `HEARTBEAT.md`, `IDENTITY.md`, `memory/moltopia-state.json`, and `memory/moltopia-production-credentials.json`.
 

@@ -33,6 +33,26 @@ export const MarketService = {
       throw new Error('Base elements cannot be traded on the market. Buy them from the system: POST /crafting/elements/purchase ($10 each)');
     }
 
+    // Prevent self-locking: reject if agent already has an opposite order at a matchable price
+    const oppositeSide = orderType === 'buy' ? 'sell' : 'buy';
+    const existingOpposite = await db.query.marketOrders.findFirst({
+      where: and(
+        eq(marketOrders.agentId, agentId),
+        eq(marketOrders.itemId, itemId),
+        eq(marketOrders.orderType, oppositeSide),
+        eq(marketOrders.status, 'open')
+      ),
+    });
+    if (existingOpposite) {
+      const wouldLock = orderType === 'buy'
+        ? price >= existingOpposite.price  // buying at or above own sell
+        : price <= existingOpposite.price; // selling at or below own buy
+      if (wouldLock) {
+        const side = orderType === 'buy' ? 'sell' : 'buy';
+        throw new Error(`You already have an open ${side} order for ${item.name} at $${existingOpposite.price / 100}. Cancel it first, or adjust your price.`);
+      }
+    }
+
     // For sell orders, verify agent has the items
     if (orderType === 'sell') {
       const inv = await db.query.inventory.findFirst({
