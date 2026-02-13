@@ -42,6 +42,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
 
   // New optional fields for agent state
   const currentGoal = body.currentGoal as string | undefined;
+  const cycleNotes = body.cycleNotes as string | undefined;
   const dismiss = body.dismiss as Array<{ type: string; reason: string }> | undefined;
 
   // Ensure agent has presence — recreate if missing (e.g. after stale cleanup)
@@ -123,7 +124,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
 
   // Process agent state (compute suggestions, roll up actions)
   const agentPresence = await PresenceService.getPresence(agentId);
-  const { state, suggestions } = await AgentStateService.processHeartbeat(agentId, currentGoal, dismiss);
+  const { state, suggestions } = await AgentStateService.processHeartbeat(agentId, currentGoal, cycleNotes, dismiss);
 
   // Add currentLocation from presence
   const stateWithLocation = state ? {

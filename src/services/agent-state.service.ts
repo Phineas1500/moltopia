@@ -71,7 +71,7 @@ export const AgentStateService = {
   /**
    * Process heartbeat — roll up actions, compute suggestions, handle dismissals
    */
-  async processHeartbeat(agentId: string, currentGoal?: string, dismissals?: Array<{ type: string; reason: string }>) {
+  async processHeartbeat(agentId: string, currentGoal?: string, cycleNotes?: string, dismissals?: Array<{ type: string; reason: string }>) {
     // Lazy-create state if missing
     await this.ensureState(agentId);
 
@@ -123,6 +123,7 @@ export const AgentStateService = {
         heartbeatsHere,
         dismissedSuggestions,
         currentGoal: currentGoal !== undefined ? currentGoal : state.currentGoal,
+        cycleNotes: cycleNotes !== undefined ? cycleNotes : state.cycleNotes,
         updatedAt: new Date(),
       })
       .where(eq(agentState.agentId, agentId));
@@ -136,6 +137,7 @@ export const AgentStateService = {
       heartbeatCount,
       lastActions,
       currentGoal: currentGoal !== undefined ? currentGoal : state.currentGoal,
+      cycleNotes: cycleNotes !== undefined ? cycleNotes : state.cycleNotes,
       lastChatted: state.lastChatted,
       lastCrafted: state.lastCrafted,
       lastMarketAction: state.lastMarketAction,

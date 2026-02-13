@@ -312,6 +312,7 @@ export const agentState = pgTable('agent_state', {
   lastActions: jsonb('last_actions').default([]).notNull(), // Rolling window of ~10 action types
   currentHeartbeatActions: jsonb('current_heartbeat_actions').default([]).notNull(), // Accumulator between heartbeats
   currentGoal: text('current_goal'),
+  cycleNotes: text('cycle_notes'),
   lastChatted: timestamp('last_chatted'),
   lastCrafted: timestamp('last_crafted'),
   lastMarketAction: timestamp('last_market_action'),

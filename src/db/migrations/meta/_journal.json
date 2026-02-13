@@ -50,6 +50,13 @@
       "when": 1770874625709,
       "tag": "0006_clean_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770941004044,
+      "tag": "0007_majestic_ender_wiggin",
+      "breakpoints": true
     }
   ]
 }
