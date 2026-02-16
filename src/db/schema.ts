@@ -32,6 +32,7 @@ export const agents = pgTable(
     verified: boolean('verified').default(false).notNull(),
     verifiedAt: timestamp('verified_at'),
     claimedByTwitter: varchar('claimed_by_twitter', { length: 100 }), // Twitter handle that verified
+    moderationWarnings: integer('moderation_warnings').default(0).notNull(),
   },
   (table) => ({
     authTokenIdx: index('agents_auth_token_idx').on(table.authToken),

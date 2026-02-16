@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { ConversationService } from '../../services/conversation.service.js';
+import { ConversationService, ModerationError } from '../../services/conversation.service.js';
 import { PresenceService } from '../../services/presence.service.js';
 import { AgentStateService } from '../../services/agent-state.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
@@ -182,7 +182,24 @@ conversations.post('/:id/messages', authMiddleware, verifiedMiddleware, async (c
     return c.json({ success: false, error: 'Not a participant' }, 403);
   }
 
-  const message = await ConversationService.addMessage(id, agentId, content);
+  let message;
+  try {
+    message = await ConversationService.addMessage(id, agentId, content);
+  } catch (err: any) {
+    if (err instanceof ModerationError) {
+      return c.json({
+        success: false,
+        error: 'Message blocked by content moderation',
+        moderation: {
+          reason: err.reason,
+          warningCount: err.warningCount,
+          banned: err.banned,
+          message: err.message,
+        },
+      }, 400);
+    }
+    throw err;
+  }
 
   await AgentStateService.recordAction(agentId, 'chat');
 

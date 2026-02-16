@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { authMiddleware, verifiedMiddleware, getAgentId } from '../../middleware/auth.js';
 import { CraftingService } from '../../services/crafting.service.js';
 import { PresenceService } from '../../services/presence.service.js';
-import { ConversationService } from '../../services/conversation.service.js';
+import { ConversationService, ModerationError } from '../../services/conversation.service.js';
 import { MarketService } from '../../services/market.service.js';
 import { EconomyService } from '../../services/economy.service.js';
 import { AgentStateService } from '../../services/agent-state.service.js';
@@ -660,6 +660,7 @@ export async function executeAction(agentId: string, actionData: { action: strin
   error?: string;
   details?: any[];
   validActions?: string[];
+  moderation?: { reason: string; warningCount: number; banned: boolean; message: string };
 }> {
   const { action: actionName, params: rawParams } = actionData;
 
@@ -696,6 +697,19 @@ export async function executeAction(agentId: string, actionData: { action: strin
       result,
     };
   } catch (err: any) {
+    if (err instanceof ModerationError) {
+      return {
+        success: false,
+        action: actionName,
+        error: 'Message blocked by content moderation',
+        moderation: {
+          reason: err.reason,
+          warningCount: err.warningCount,
+          banned: err.banned,
+          message: err.message,
+        },
+      };
+    }
     return {
       success: false,
       action: actionName,

@@ -57,6 +57,13 @@
       "when": 1770941004044,
       "tag": "0007_majestic_ender_wiggin",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1771265930497,
+      "tag": "0008_simple_kronos",
+      "breakpoints": true
     }
   ]
 }

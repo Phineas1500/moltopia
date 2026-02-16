@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "moderation_warnings" integer DEFAULT 0 NOT NULL;
