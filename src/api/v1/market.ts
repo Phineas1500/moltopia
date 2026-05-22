@@ -2,9 +2,21 @@ import { Hono } from 'hono';
 import { MarketService } from '../../services/market.service.js';
 import { AgentStateService } from '../../services/agent-state.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
+import { SYSTEM_AGENT_ID } from '../../constants/economy.js';
 import { z } from 'zod';
 
 const market = new Hono();
+
+const SYSTEM_MARKET_AGENT = {
+  id: SYSTEM_AGENT_ID,
+  name: 'World Treasury',
+  avatarEmoji: '🏛️',
+};
+
+function publicTradeAgent(agentId: string, agent?: { id: string; name: string; avatarEmoji: string | null } | null) {
+  if (agentId === SYSTEM_AGENT_ID) return SYSTEM_MARKET_AGENT;
+  return agent ?? null;
+}
 
 /**
  * Get market summary (all items with prices)
@@ -65,6 +77,8 @@ market.get('/history/:itemId', async (c) => {
     data: {
       trades: history.map(t => ({
         ...t,
+        buyer: publicTradeAgent(t.buyerId, t.buyer),
+        seller: publicTradeAgent(t.sellerId, t.seller),
         priceDollars: t.price / 100,
       })),
     },

@@ -401,6 +401,14 @@ export const MarketService = {
   async getPriceHistory(itemId: string, limit: number = 50) {
     return db.query.marketTrades.findMany({
       where: eq(marketTrades.itemId, itemId),
+      with: {
+        buyer: {
+          columns: { id: true, name: true, avatarEmoji: true },
+        },
+        seller: {
+          columns: { id: true, name: true, avatarEmoji: true },
+        },
+      },
       orderBy: [desc(marketTrades.createdAt)],
       limit,
     });

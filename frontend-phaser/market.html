@@ -794,9 +794,27 @@
   <script>
     initNav();
     const API_URL = '/api/v1';
+    const SYSTEM_AGENT_ID = 'agent_system';
     let marketData = [];
     let agents = new Map();
     let allTrades = [];
+
+    function tradeParticipant(trade, role) {
+      const embedded = trade[role];
+      const id = trade[`${role}Id`];
+
+      if (id === SYSTEM_AGENT_ID) {
+        return { id, name: 'World Treasury', avatarEmoji: '🏛️' };
+      }
+      if (embedded?.name) return embedded;
+
+      return agents.get(id) || { id, name: 'Unknown', avatarEmoji: '?' };
+    }
+
+    function participantLabel(participant) {
+      if (participant?.id === SYSTEM_AGENT_ID) return '🏛️ World Treasury';
+      return `${participant?.avatarEmoji || '?'} ${participant?.name || 'Unknown'}`;
+    }
 
     // Tab switching
     function showTab(tabId) {
@@ -881,7 +899,7 @@
           const bidsHtml = data.data.bids.length > 0
             ? data.data.bids.map(b => `
                 <div class="orderbook-row">
-                  <span>${b.agent?.avatarEmoji || '?'} ${b.agent?.name || 'Unknown'}</span>
+                  <span>${participantLabel(b.agent)}</span>
                   <span>$${b.priceDollars.toFixed(2)} x${b.quantity}</span>
                 </div>
               `).join('')
@@ -891,7 +909,7 @@
             ? data.data.asks.map(a => `
                 <div class="orderbook-row">
                   <span>$${a.priceDollars.toFixed(2)} x${a.quantity}</span>
-                  <span>${a.agent?.avatarEmoji || '?'} ${a.agent?.name || 'Unknown'}</span>
+                  <span>${participantLabel(a.agent)}</span>
                 </div>
               `).join('')
             : '<div style="color:#666;font-size:11px">No asks</div>';
@@ -1118,8 +1136,8 @@
     }
 
     function renderExchangeTrade(t) {
-      const buyer = agents.get(t.buyerId);
-      const seller = agents.get(t.sellerId);
+      const buyer = tradeParticipant(t, 'buyer');
+      const seller = tradeParticipant(t, 'seller');
       return `
         <div class="trade-item">
           <div class="trade-info">
@@ -1130,7 +1148,7 @@
             <span class="trade-qty">x${t.quantity}</span>
           </div>
           <div style="font-size:11px;color:#8b9bb4">
-            ${seller?.avatarEmoji || '?'} ${seller?.name || 'Unknown'} &rarr; ${buyer?.avatarEmoji || '?'} ${buyer?.name || 'Unknown'}
+            ${participantLabel(seller)} &rarr; ${participantLabel(buyer)}
           </div>
           <div class="trade-time">${formatTimeAgo(t.createdAt)}</div>
         </div>

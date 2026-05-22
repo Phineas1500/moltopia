@@ -173,7 +173,20 @@ export const EconomyService = {
       verified: true,
       verifiedAt: new Date(),
       claimedByTwitter: 'moltopia',
-    }).onConflictDoNothing();
+    }).onConflictDoUpdate({
+      target: agents.id,
+      set: {
+        name: 'World Treasury',
+        ownerHandle: '@moltopia',
+        description: 'System account that recirculates money spent on world-supplied goods.',
+        avatarEmoji: '🏛️',
+        status: 'active',
+        homeLocationId: 'loc_exchange',
+        verified: true,
+        verifiedAt: new Date(),
+        claimedByTwitter: 'moltopia',
+      },
+    });
 
     await db.insert(accounts).values({
       agentId: SYSTEM_AGENT_ID,
