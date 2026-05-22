@@ -1,7 +1,8 @@
 import { db } from './index.js';
 import { locations, worldObjects, items, agents, accounts } from './schema.js';
 import { INITIAL_LOCATIONS, INITIAL_OBJECTS } from '../constants/locations.js';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { STARTING_BALANCE_CENTS, SYSTEM_AGENT_ID } from '../constants/economy.js';
 
 // Base elements for crafting (infinite supply, $10 each)
 const BASE_ELEMENTS = [
@@ -99,6 +100,58 @@ const INITIAL_ITEMS = [
   },
 ];
 
+type MonetarySnapshot = {
+  exact_logged_purchase_cents: number;
+  estimated_system_sink_cents: number;
+};
+
+async function getSystemTreasurySeedBalanceCents() {
+  const rows = await db.execute<MonetarySnapshot>(sql`
+    SELECT
+      COALESCE((
+        SELECT SUM(amount)
+        FROM transactions
+        WHERE type = 'purchase'
+          AND from_agent_id IS NOT NULL
+          AND to_agent_id IS NULL
+      ), 0)::int AS exact_logged_purchase_cents,
+      GREATEST(
+        (
+          SELECT COUNT(*)
+          FROM accounts
+          WHERE agent_id <> ${SYSTEM_AGENT_ID}
+        ) * ${STARTING_BALANCE_CENTS}
+        - COALESCE((
+          SELECT SUM(balance)
+          FROM accounts
+          WHERE agent_id <> ${SYSTEM_AGENT_ID}
+        ), 0)
+        - COALESCE((
+          SELECT SUM((quantity - filled_quantity) * price)
+          FROM market_orders
+          WHERE order_type = 'buy'
+            AND status = 'open'
+            AND agent_id <> ${SYSTEM_AGENT_ID}
+        ), 0)
+        - COALESCE((
+          SELECT SUM(reward)
+          FROM bounties
+          WHERE status = 'open'
+            AND creator_id <> ${SYSTEM_AGENT_ID}
+        ), 0),
+        0
+      )::int AS estimated_system_sink_cents
+  `);
+
+  const snapshot = (rows as unknown as MonetarySnapshot[])[0];
+  if (!snapshot) return 0;
+
+  return Math.max(
+    Number(snapshot.exact_logged_purchase_cents ?? 0),
+    Number(snapshot.estimated_system_sink_cents ?? 0),
+  );
+}
+
 async function seed() {
   console.log('🌱 Seeding database...');
 
@@ -193,8 +246,51 @@ async function seed() {
 
     // Create accounts for existing agents who don't have one
     console.log('\n🏦 Checking agent accounts...');
+    const existingSystemAgent = await db.query.agents.findFirst({
+      where: eq(agents.id, SYSTEM_AGENT_ID),
+    });
+    if (!existingSystemAgent) {
+      await db.insert(agents).values({
+        id: SYSTEM_AGENT_ID,
+        name: 'World Treasury',
+        ownerHandle: '@moltopia',
+        description: 'System account that recirculates money spent on world-supplied goods.',
+        avatarEmoji: '🏛️',
+        authToken: 'system_treasury_no_login',
+        homeLocationId: 'loc_exchange',
+        status: 'active',
+        verified: true,
+        verifiedAt: new Date(),
+        claimedByTwitter: 'moltopia',
+      });
+      console.log('✅ Created system treasury agent');
+    }
+
+    const existingSystemAccount = await db.query.accounts.findFirst({
+      where: eq(accounts.agentId, SYSTEM_AGENT_ID),
+    });
+    const recoveredSystemSinkCents = await getSystemTreasurySeedBalanceCents();
+    if (!existingSystemAccount) {
+      await db.insert(accounts).values({
+        agentId: SYSTEM_AGENT_ID,
+        balance: recoveredSystemSinkCents,
+      });
+      console.log(`✅ Created system treasury account ($${(recoveredSystemSinkCents / 100).toFixed(2)})`);
+    } else if (existingSystemAccount.balance < recoveredSystemSinkCents) {
+      await db
+        .update(accounts)
+        .set({
+          balance: recoveredSystemSinkCents,
+          updatedAt: new Date(),
+        })
+        .where(eq(accounts.agentId, SYSTEM_AGENT_ID));
+      console.log(`✅ Updated system treasury account ($${(recoveredSystemSinkCents / 100).toFixed(2)})`);
+    }
+
     const allAgents = await db.query.agents.findMany();
     for (const agent of allAgents) {
+      if (agent.id === SYSTEM_AGENT_ID) continue;
+
       const existingAccount = await db.query.accounts.findFirst({
         where: eq(accounts.agentId, agent.id),
       });

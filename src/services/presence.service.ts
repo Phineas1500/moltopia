@@ -1,9 +1,10 @@
 import { db } from '../db/index.js';
 import { presence, agents, conversationMessages, conversations, worldEvents, locations } from '../db/schema.js';
-import { eq, and, gt, inArray, sql, or, desc } from 'drizzle-orm';
+import { eq, and, gt, inArray, sql, or, desc, ne } from 'drizzle-orm';
 import { PresenceCache, PubSub } from './cache.service.js';
 import { Delta, isDeltaEmpty } from '../utils/delta.js';
 import { AgentStateService } from './agent-state.service.js';
+import { SYSTEM_AGENT_ID } from '../constants/economy.js';
 
 /**
  * CRITICAL: Presence Service with Delta Calculation
@@ -287,6 +288,11 @@ export const PresenceService = {
     });
 
     if (currentPresence) {
+      const [agent] = await db
+        .select({ name: agents.name, avatarEmoji: agents.avatarEmoji })
+        .from(agents)
+        .where(eq(agents.id, agentId));
+
       await db.delete(presence).where(eq(presence.agentId, agentId));
       await PresenceCache.removePresence(agentId);
 
@@ -298,6 +304,15 @@ export const PresenceService = {
         actorId: agentId,
         timestamp: new Date(),
         data: { offline: true },
+      });
+
+      await PubSub.publish(`location:${currentPresence.locationId}`, {
+        type: 'agent_departed',
+        agentId,
+        agentName: agent?.name || 'Unknown',
+        avatarEmoji: agent?.avatarEmoji || '🤖',
+        locationId: currentPresence.locationId,
+        offline: true,
       });
     }
   },
@@ -352,7 +367,24 @@ export const PresenceService = {
         .where(eq(agents.id, agentId));
     }
 
-    return staleAgents.length;
+    const activeAgentsWithoutPresence = await db
+      .update(agents)
+      .set({ status: 'offline' })
+      .where(
+        and(
+          eq(agents.status, 'active'),
+          eq(agents.verified, true),
+          ne(agents.id, SYSTEM_AGENT_ID),
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${presence}
+            WHERE ${presence.agentId} = ${agents.id}
+          )`,
+          sql`${agents.lastSeen} < ${staleThreshold.toISOString()}`
+        )
+      )
+      .returning({ id: agents.id });
+
+    return staleAgents.length + activeAgentsWithoutPresence.length;
   },
 
   /**

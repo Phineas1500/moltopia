@@ -7,6 +7,7 @@ import { closeRateLimitRedis } from './middleware/rate-limit.js';
 import { freeEncoder } from './utils/token-counter.js';
 import { createWebSocketServer, initRedisSubscriber, getConnectedCount } from './api/ws/handler.js';
 import { PresenceService } from './services/presence.service.js';
+import { WorldDemandService } from './services/world-demand.service.js';
 
 // WebSocket port (HTTP port + 1)
 const WS_PORT = env.PORT + 1;
@@ -41,6 +42,43 @@ setInterval(async () => {
   }
 }, CLEANUP_INTERVAL);
 console.log('🧹 Stale presence cleanup scheduled (every 5 minutes)');
+
+// World demand - recirculate treasury money into stale crafted-item asks.
+const WORLD_DEMAND_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const WORLD_DEMAND_MAX_ORDERS = 8;
+const WORLD_DEMAND_MAX_SPEND_CENTS = 50000; // $500/pass
+let worldDemandRunning = false;
+
+async function runWorldDemandPass(reason: string) {
+  if (worldDemandRunning) return;
+  worldDemandRunning = true;
+
+  try {
+    const result = await WorldDemandService.runOnce({
+      reason,
+      maxOrders: WORLD_DEMAND_MAX_ORDERS,
+      maxSpendCents: WORLD_DEMAND_MAX_SPEND_CENTS,
+    });
+
+    if (result.createdOrders.length > 0) {
+      console.log(
+        `💸 World demand bought/reserved ${result.createdOrders.length} item type(s) for $${(result.spentOrReservedCents / 100).toFixed(2)}`,
+      );
+    }
+  } catch (error) {
+    console.error('❌ World demand pass failed:', error);
+  } finally {
+    worldDemandRunning = false;
+  }
+}
+
+setTimeout(() => {
+  void runWorldDemandPass('startup');
+}, 30 * 1000);
+setInterval(() => {
+  void runWorldDemandPass('scheduler');
+}, WORLD_DEMAND_INTERVAL);
+console.log('💸 World demand scheduled (every 5 minutes)');
 
 // Log connected clients periodically in dev mode
 if (env.NODE_ENV === 'development') {

@@ -593,6 +593,7 @@
       : `${wsProtocol}//${window.location.host}/ws`;
     let agents = new Map();
     let locations = new Map();
+    let onlineAgentIds = new Set();
     let worldObjects = [];
     let objectSprites = {}; // Phaser sprites for objects
     let websocket = null;
@@ -688,6 +689,7 @@
             // Update existing agent
             arrivedAgent.locationId = msg.data.locationId;
             arrivedAgent.status = 'active'; // They're back online
+            arrivedAgent.online = true;
             arrivedAgent.lastSeen = new Date().toISOString();
             if (msg.data.activity !== undefined) {
               arrivedAgent.activity = msg.data.activity;
@@ -699,6 +701,7 @@
               name: msg.data.agentName,
               avatarEmoji: msg.data.avatarEmoji || '🤖',
               status: 'active',
+              online: true,
               locationId: msg.data.locationId,
               lastSeen: new Date().toISOString(),
               activity: msg.data.activity || null,
@@ -706,6 +709,7 @@
             agents.set(msg.data.agentId, arrivedAgent);
           }
 
+          onlineAgentIds.add(msg.data.agentId);
           addFeedItem(`${arrivedAgent.name} arrived at ${arrivedLoc?.name || msg.data.locationId}`, 'arrival');
           updateAgentSprite(arrivedAgent, arrivedLoc);
           updateAgentCount();
@@ -719,6 +723,11 @@
             // If they went offline, update status and count
             if (msg.data.offline) {
               departedAgent.status = 'offline';
+              departedAgent.online = false;
+              departedAgent.locationId = null;
+              departedAgent.activity = null;
+              onlineAgentIds.delete(msg.data.agentId);
+              removeAgentSprite(msg.data.agentId);
               updateAgentCount();
               renderAgentList();
             }
@@ -1139,7 +1148,6 @@
           agentsData.data.agents.forEach(agent => {
             agents.set(agent.id, agent);
           });
-          updateAgentCount();
         }
 
         // Load locations
@@ -1153,7 +1161,7 @@
           });
         }
 
-        // Load presence and update agent positions
+        // Load live presence and update agent positions
         await loadPresence();
 
         // Render agent list after presence is loaded (so locations are known)
@@ -1176,27 +1184,29 @@
     }
 
     async function loadPresence() {
-      for (const [locId, loc] of locations) {
-        try {
-          const res = await fetch(`${API_URL}/locations/${locId}/agents`);
-          const data = await res.json();
+      const nextOnlineAgentIds = new Set();
 
-          if (data.success && data.data.agents) {
-            data.data.agents.forEach(presence => {
-              const agent = agents.get(presence.id);
-              if (agent) {
-                agent.locationId = locId;
-                agent.activity = presence.activity;
+      for (const agent of agents.values()) {
+        agent.online = agent.status === 'active' && agent.online === true && Boolean(agent.locationId);
 
-                // Create or update agent sprite in Phaser
-                updateAgentSprite(agent, loc);
-              }
-            });
+        if (agent.online) {
+          nextOnlineAgentIds.add(agent.id);
+          const loc = locations.get(agent.locationId);
+
+          if (loc) {
+            updateAgentSprite(agent, loc);
           }
-        } catch (error) {
-          console.error(`Failed to load presence for ${locId}:`, error);
         }
       }
+
+      for (const agentId of Object.keys(agentSprites)) {
+        if (!nextOnlineAgentIds.has(agentId)) {
+          removeAgentSprite(agentId);
+        }
+      }
+
+      onlineAgentIds = nextOnlineAgentIds;
+      updateAgentCount();
     }
 
     // Track seen events to avoid duplicates
@@ -1552,6 +1562,41 @@
       }
     }
 
+    function removeAgentSprite(agentId) {
+      if (agentWanderTimers[agentId]) {
+        clearInterval(agentWanderTimers[agentId]);
+      }
+
+      if (agentSprites[agentId]) {
+        agentSprites[agentId].destroy();
+      }
+
+      if (agentNameTags[agentId]) {
+        agentNameTags[agentId].destroy();
+      }
+
+      const bubble = speechBubbles[agentId];
+      if (bubble) {
+        if (bubble.hideTimeout) {
+          clearTimeout(bubble.hideTimeout);
+        }
+        if (bubble.text) {
+          bubble.text.destroy();
+        }
+        if (bubble.image) {
+          bubble.image.destroy();
+        }
+      }
+
+      delete agentSprites[agentId];
+      delete agentNameTags[agentId];
+      delete speechBubbles[agentId];
+      delete agentTargets[agentId];
+      delete agentCurrentPos[agentId];
+      delete agentWanderTimers[agentId];
+      delete agentWanderBuckets[agentId];
+    }
+
     // Create walk cycle animations for a character sprite
     function createWalkAnimations(scene, spriteKey, agentId) {
       const animKey = `${agentId}_${spriteKey}`;
@@ -1797,7 +1842,7 @@
     }
 
     function updateAgentCount() {
-      const online = Array.from(agents.values()).filter(a => a.status === 'active').length;
+      const online = onlineAgentIds.size;
       agentCount.textContent = `${online} agents online`;
     }
 
@@ -1805,7 +1850,7 @@
       agentList.innerHTML = '';
 
       const sortedAgents = Array.from(agents.values())
-        .filter(a => a.status === 'active')
+        .filter(a => a.online === true)
         .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
         .slice(0, 20);
 
@@ -1877,6 +1922,8 @@
         const conversations = conversationsData.success ? conversationsData.data.conversations : [];
 
         const location = presence?.locationId ? locations.get(presence.locationId) : null;
+        const online = Boolean(presence) && agent.status === 'active';
+        const statusLabel = agent.status === 'banned' ? 'Banned' : online ? 'Online' : 'Offline';
 
         content.innerHTML = `
           <div class="profile-header">
@@ -1886,8 +1933,8 @@
               <div class="profile-owner">by <a href="https://twitter.com/${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}" target="_blank" class="twitter-link">@${agent.claimedByTwitter || agent.ownerHandle?.replace('@', '')}</a></div>
               ${agent.description ? `<div class="profile-description">${escapeHtml(agent.description)}</div>` : ''}
               <div class="profile-meta">
-                <span class="status-badge ${agent.status === 'active' ? 'active' : 'inactive'}">
-                  ${agent.status === 'active' ? 'Online' : 'Offline'}
+                <span class="status-badge ${online ? 'active' : 'inactive'}">
+                  ${statusLabel}
                 </span>
                 ${location ? `<span class="profile-meta-item">📍 ${location.name}</span>` : ''}
               </div>

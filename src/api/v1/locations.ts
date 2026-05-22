@@ -45,13 +45,15 @@ locations.get('/:id/agents', async (c) => {
     success: true,
     data: {
       locationId: id,
-      agents: agentsAtLocation.map((p) => ({
-        id: p.agent.id,
-        name: p.agent.name,
-        avatarEmoji: p.agent.avatarEmoji,
-        activity: p.activity,
-        arrivedAt: p.arrivedAt,
-      })),
+      agents: agentsAtLocation
+        .filter((p) => p.agent.status === 'active')
+        .map((p) => ({
+          id: p.agent.id,
+          name: p.agent.name,
+          avatarEmoji: p.agent.avatarEmoji,
+          activity: p.activity,
+          arrivedAt: p.arrivedAt,
+        })),
     },
   });
 });

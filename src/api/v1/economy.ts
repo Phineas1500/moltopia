@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { EconomyService } from '../../services/economy.service.js';
 import { AgentStateService } from '../../services/agent-state.service.js';
+import { WorldDemandService } from '../../services/world-demand.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { z } from 'zod';
 import { db } from '../../db/index.js';
@@ -59,6 +60,18 @@ economy.get('/transactions', authMiddleware, verifiedMiddleware, async (c) => {
   return c.json({
     success: true,
     data: { transactions },
+  });
+});
+
+/**
+ * Get system treasury and world-demand stats
+ */
+economy.get('/stats', async (c) => {
+  const stats = await WorldDemandService.getStats();
+
+  return c.json({
+    success: true,
+    data: stats,
   });
 });
 

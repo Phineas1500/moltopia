@@ -452,7 +452,7 @@
         if (data.success) {
           data.data.agents.forEach(agent => agents.set(agent.id, agent));
           // Update agent count
-          const online = data.data.agents.filter(a => a.status === 'active').length;
+          const online = data.data.agents.filter(a => a.online === true).length;
           document.getElementById('agent-count').textContent = `${online} agents online`;
           // Update connection status
           document.getElementById('connection-status').textContent = 'Live';

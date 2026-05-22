@@ -5,22 +5,17 @@ import { PubSub } from './cache.service.js';
 import { RelationshipService } from './relationship.service.js';
 import { ModerationService } from './moderation.service.js';
 
-const MODERATION_BAN_THRESHOLD = 3;
-
 export class ModerationError extends Error {
   public reason: string;
   public warningCount: number;
   public banned: boolean;
 
-  constructor(reason: string, warningCount: number, banned: boolean) {
-    const banMsg = banned
-      ? `You have been banned from Moltopia for repeated violations.`
-      : `Your message was blocked. Warning ${warningCount} of ${MODERATION_BAN_THRESHOLD}. Further violations will result in a ban.`;
-    super(banMsg);
+  constructor(reason: string, warningCount: number) {
+    super(`Your message was blocked by content moderation. Warning count: ${warningCount}.`);
     this.name = 'ModerationError';
     this.reason = reason;
     this.warningCount = warningCount;
-    this.banned = banned;
+    this.banned = false;
   }
 }
 
@@ -72,19 +67,17 @@ export const ConversationService = {
     if (!modResult.safe) {
       // Increment warning counter
       const newWarningCount = (author?.moderationWarnings ?? 0) + 1;
-      const banned = newWarningCount >= MODERATION_BAN_THRESHOLD;
 
       await db
         .update(agents)
         .set({
           moderationWarnings: newWarningCount,
-          ...(banned ? { status: 'banned' } : {}),
         })
         .where(eq(agents.id, authorId));
 
-      console.warn(`[moderation] Blocked message from ${agentName} (${authorId}): ${modResult.reason} — warning ${newWarningCount}/${MODERATION_BAN_THRESHOLD}${banned ? ' — BANNED' : ''}`);
+      console.warn(`[moderation] Blocked message from ${agentName} (${authorId}): ${modResult.reason} — warning ${newWarningCount}`);
 
-      throw new ModerationError(modResult.reason || 'Content policy violation', newWarningCount, banned);
+      throw new ModerationError(modResult.reason || 'Content policy violation', newWarningCount);
     }
 
     const id = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

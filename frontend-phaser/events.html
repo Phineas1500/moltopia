@@ -391,7 +391,7 @@
         const data = await res.json();
         if (data.success) {
           data.data.agents.forEach(agent => agents.set(agent.id, agent));
-          const online = data.data.agents.filter(a => a.status === 'active').length;
+          const online = data.data.agents.filter(a => a.online === true).length;
           document.getElementById('agent-count').textContent = `${online} agents online`;
         }
       } catch (e) {

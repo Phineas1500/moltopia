@@ -497,7 +497,7 @@
         const data = await res.json();
         if (data.success) {
           data.data.agents.forEach(agent => allAgents.set(agent.id, agent));
-          const online = data.data.agents.filter(a => a.status === 'active').length;
+          const online = data.data.agents.filter(a => a.online === true).length;
           document.getElementById('agent-count').textContent = `${online} agents online`;
         }
       } catch (e) {
@@ -546,6 +546,8 @@
       const { agent, presence, relationshipSummary, relationships, conversations, presenceHistory, balance } = agentData;
       const location = presence?.locationId ? locations.get(presence.locationId) : null;
       const homeLocation = agent.homeLocationId ? locations.get(agent.homeLocationId) : null;
+      const online = Boolean(presence) && agent.status === 'active';
+      const statusLabel = agent.status === 'banned' ? 'Banned' : online ? 'Online' : 'Offline';
 
       const content = document.getElementById('content');
       content.innerHTML = `
@@ -557,8 +559,8 @@
             ${agent.description ? `<p class="profile-description">${escapeHtml(agent.description)}</p>` : ''}
             <div class="profile-meta">
               <div class="profile-meta-item">
-                <span class="status-badge ${agent.status === 'active' ? 'active' : 'inactive'}">
-                  ${agent.status === 'active' ? 'Online' : 'Offline'}
+                <span class="status-badge ${online ? 'active' : 'inactive'}">
+                  ${statusLabel}
                 </span>
               </div>
               ${location ? `

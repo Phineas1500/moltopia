@@ -1,0 +1,386 @@
+import { db } from '../db/index.js';
+import { accounts, items, marketOrders, marketTrades, transactions } from '../db/schema.js';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { BASE_ELEMENT_PRICE_CENTS, STARTING_BALANCE_CENTS, SYSTEM_AGENT_ID } from '../constants/economy.js';
+import { MarketService } from './market.service.js';
+
+const CANDIDATE_LIMIT = 200;
+const DEFAULT_MAX_ORDERS = 3;
+const MAX_UNITS_PER_ORDER = 3;
+const MAX_UNIT_PRICE_CENTS = 25000; // $250
+const MIN_SELL_ORDER_AGE_MS = 15 * 60 * 1000;
+const TREASURY_SPEND_FRACTION = 0.9;
+const LOW_BALANCE_PRIORITY_CENTS = 10000; // $100
+const ONLINE_SELLER_SCORE_BONUS = 20;
+
+type DemandCandidate = {
+  order: typeof marketOrders.$inferSelect & {
+    item: typeof items.$inferSelect;
+    agent?: {
+      status: string;
+      account?: { balance: number } | null;
+      presence?: unknown | null;
+    } | null;
+  };
+  remainingQuantity: number;
+  maxAcceptablePrice: number;
+  score: number;
+};
+
+type RunOptions = {
+  maxOrders?: number;
+  minOrderAgeMs?: number;
+  maxSpendCents?: number;
+  reason?: string;
+};
+
+export const WorldDemandService = {
+  /**
+   * Spend a bounded slice of the system treasury on stale crafted-item asks.
+   */
+  async runOnce(options: RunOptions = {}) {
+    const treasuryBalance = await this.getTreasuryBalanceCents();
+
+    if (treasuryBalance < BASE_ELEMENT_PRICE_CENTS) {
+      return {
+        createdOrders: [],
+        spentOrReservedCents: 0,
+        skippedReason: 'treasury_too_low',
+      };
+    }
+
+    const spendableFromTreasury = Math.floor(treasuryBalance * TREASURY_SPEND_FRACTION);
+    const spendable = Math.min(spendableFromTreasury, options.maxSpendCents ?? spendableFromTreasury);
+    if (spendable <= 0) {
+      return {
+        createdOrders: [],
+        spentOrReservedCents: 0,
+        skippedReason: 'nothing_spendable',
+      };
+    }
+
+    const candidates = await this.getDemandCandidates(options.minOrderAgeMs ?? MIN_SELL_ORDER_AGE_MS);
+    const maxOrders = options.maxOrders ?? DEFAULT_MAX_ORDERS;
+    const createdOrders: Array<{
+      orderId: string | null;
+      itemId: string;
+      itemName: string;
+      priceCents: number;
+      quantity: number;
+    }> = [];
+
+    let spentOrReservedCents = 0;
+    const boughtItemIds = new Set<string>();
+
+    for (const candidate of candidates) {
+      if (createdOrders.length >= maxOrders) break;
+      if (boughtItemIds.has(candidate.order.itemId)) continue;
+
+      const remainingBudget = spendable - spentOrReservedCents;
+      const quantity = Math.min(
+        candidate.remainingQuantity,
+        Math.floor(remainingBudget / candidate.order.price),
+        MAX_UNITS_PER_ORDER,
+      );
+
+      if (quantity <= 0) break;
+
+      try {
+        const order = await MarketService.placeOrder({
+          agentId: SYSTEM_AGENT_ID,
+          itemId: candidate.order.itemId,
+          orderType: 'buy',
+          price: candidate.order.price,
+          quantity,
+          expiresInHours: 24,
+          skipPresence: true,
+        });
+
+        createdOrders.push({
+          orderId: order?.id ?? null,
+          itemId: candidate.order.itemId,
+          itemName: candidate.order.item.name,
+          priceCents: candidate.order.price,
+          quantity,
+        });
+        spentOrReservedCents += candidate.order.price * quantity;
+        boughtItemIds.add(candidate.order.itemId);
+      } catch (error) {
+        console.error('World demand order failed:', {
+          reason: options.reason,
+          itemId: candidate.order.itemId,
+          price: candidate.order.price,
+          quantity,
+          error,
+        });
+      }
+    }
+
+    return {
+      createdOrders,
+      spentOrReservedCents,
+      skippedReason: createdOrders.length === 0 ? 'no_matching_asks' : null,
+    };
+  },
+
+  async getStats() {
+    const [treasury] = await db
+      .select({ balance: accounts.balance })
+      .from(accounts)
+      .where(eq(accounts.agentId, SYSTEM_AGENT_ID))
+      .limit(1);
+
+    const [reservedSystemBids] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM((${marketOrders.quantity} - ${marketOrders.filledQuantity}) * ${marketOrders.price}), 0)::int`,
+      })
+      .from(marketOrders)
+      .where(and(
+        eq(marketOrders.agentId, SYSTEM_AGENT_ID),
+        eq(marketOrders.orderType, 'buy'),
+        eq(marketOrders.status, 'open'),
+      ));
+
+    const [legacyLoggedPurchases] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)::int`,
+      })
+      .from(transactions)
+      .where(sql`${transactions.type} = 'purchase' AND ${transactions.fromAgentId} IS NOT NULL AND ${transactions.toAgentId} IS NULL`);
+
+    const estimatedHistoricalSinkRows = await db.execute<{ estimated_system_sink_cents: number }>(sql`
+      SELECT GREATEST(
+        (
+          SELECT COUNT(*)
+          FROM accounts
+          WHERE agent_id <> ${SYSTEM_AGENT_ID}
+        ) * ${STARTING_BALANCE_CENTS}
+        - COALESCE((
+          SELECT SUM(balance)
+          FROM accounts
+          WHERE agent_id <> ${SYSTEM_AGENT_ID}
+        ), 0)
+        - COALESCE((
+          SELECT SUM((quantity - filled_quantity) * price)
+          FROM market_orders
+          WHERE order_type = 'buy'
+            AND status = 'open'
+            AND agent_id <> ${SYSTEM_AGENT_ID}
+        ), 0)
+        - COALESCE((
+          SELECT SUM(reward)
+          FROM bounties
+          WHERE status = 'open'
+            AND creator_id <> ${SYSTEM_AGENT_ID}
+        ), 0),
+        0
+      )::int AS estimated_system_sink_cents
+    `);
+
+    const [creditedPurchases] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)::int`,
+      })
+      .from(transactions)
+      .where(and(
+        eq(transactions.type, 'purchase'),
+        eq(transactions.toAgentId, SYSTEM_AGENT_ID),
+      ));
+
+    const [worldDemandTrades] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${marketTrades.price} * ${marketTrades.quantity}), 0)::int`,
+      })
+      .from(marketTrades)
+      .where(eq(marketTrades.buyerId, SYSTEM_AGENT_ID));
+
+    const [recoveryWorkPayouts] = await db
+      .select({
+        total: sql<number>`COALESCE(SUM(${transactions.amount}), 0)::int`,
+      })
+      .from(transactions)
+      .where(and(
+        eq(transactions.fromAgentId, SYSTEM_AGENT_ID),
+        eq(transactions.referenceType, 'world_work'),
+      ));
+
+    const [openSellOrders] = await db
+      .select({
+        count: sql<number>`COUNT(*)::int`,
+      })
+      .from(marketOrders)
+      .where(and(
+        eq(marketOrders.orderType, 'sell'),
+        eq(marketOrders.status, 'open'),
+        ne(marketOrders.agentId, SYSTEM_AGENT_ID),
+      ));
+
+    const treasuryBalanceCents = treasury?.balance ?? 0;
+    const reservedSystemBidCents = reservedSystemBids?.total ?? 0;
+    const exactBackfilledCents = legacyLoggedPurchases?.total ?? 0;
+    const estimatedHistoricalSink = (estimatedHistoricalSinkRows as unknown as { estimated_system_sink_cents: number }[])[0];
+    const estimatedHistoricalSinkCents = Number(estimatedHistoricalSink?.estimated_system_sink_cents ?? 0);
+    const creditedPurchaseCents = creditedPurchases?.total ?? 0;
+    const worldDemandTradeCents = worldDemandTrades?.total ?? 0;
+    const recoveryWorkPayoutCents = recoveryWorkPayouts?.total ?? 0;
+    const recoveredHistoricalSinkCents = Math.max(exactBackfilledCents, estimatedHistoricalSinkCents);
+
+    return {
+      systemAgentId: SYSTEM_AGENT_ID,
+      treasuryBalanceCents,
+      treasuryBalanceDollars: treasuryBalanceCents / 100,
+      reservedSystemBidCents,
+      reservedSystemBidDollars: reservedSystemBidCents / 100,
+      exactBackfilledPurchaseCents: exactBackfilledCents,
+      exactBackfilledPurchaseDollars: exactBackfilledCents / 100,
+      estimatedHistoricalSinkCents,
+      estimatedHistoricalSinkDollars: estimatedHistoricalSinkCents / 100,
+      recoveredHistoricalSinkCents,
+      recoveredHistoricalSinkDollars: recoveredHistoricalSinkCents / 100,
+      creditedPurchaseCents,
+      creditedPurchaseDollars: creditedPurchaseCents / 100,
+      worldDemandTradeCents,
+      worldDemandTradeDollars: worldDemandTradeCents / 100,
+      recoveryWorkPayoutCents,
+      recoveryWorkPayoutDollars: recoveryWorkPayoutCents / 100,
+      openSellOrderCount: openSellOrders?.count ?? 0,
+      historicalBaseElementSpendBackfilled: recoveredHistoricalSinkCents > 0,
+    };
+  },
+
+  async getTreasuryBalanceCents(): Promise<number> {
+    const account = await db.query.accounts.findFirst({
+      where: eq(accounts.agentId, SYSTEM_AGENT_ID),
+    });
+
+    return account?.balance ?? 0;
+  },
+
+  async getDemandCandidates(minOrderAgeMs: number): Promise<DemandCandidate[]> {
+    const openSystemBids = await db.query.marketOrders.findMany({
+      where: and(
+        eq(marketOrders.agentId, SYSTEM_AGENT_ID),
+        eq(marketOrders.orderType, 'buy'),
+        eq(marketOrders.status, 'open'),
+      ),
+    });
+    const systemBidByItem = new Map<string, number>();
+    for (const bid of openSystemBids) {
+      const current = systemBidByItem.get(bid.itemId) ?? 0;
+      systemBidByItem.set(bid.itemId, Math.max(current, bid.price));
+    }
+
+    const openSells = await db.query.marketOrders.findMany({
+      where: and(
+        eq(marketOrders.orderType, 'sell'),
+        eq(marketOrders.status, 'open'),
+        ne(marketOrders.agentId, SYSTEM_AGENT_ID),
+      ),
+      with: {
+        item: true,
+        agent: {
+          with: {
+            account: true,
+            presence: true,
+          },
+        },
+      },
+      orderBy: [asc(marketOrders.price), asc(marketOrders.createdAt)],
+      limit: CANDIDATE_LIMIT,
+    });
+
+    const now = Date.now();
+    const candidates: DemandCandidate[] = [];
+    const costMemo = new Map<string, number>();
+
+    for (const order of openSells) {
+      if (!order.item || order.item.category !== 'crafted') continue;
+      if (order.agent?.status === 'banned') continue;
+
+      const remainingQuantity = order.quantity - order.filledQuantity;
+      if (remainingQuantity <= 0) continue;
+
+      const ageMs = now - order.createdAt.getTime();
+      if (ageMs < minOrderAgeMs) continue;
+
+      const existingSystemBid = systemBidByItem.get(order.itemId) ?? 0;
+      if (existingSystemBid >= order.price) continue;
+
+      const estimatedCost = await this.estimateCraftCostCents(order.itemId, costMemo);
+      const rarityPremium = order.item.currentSupply <= 3
+        ? 1.8
+        : order.item.currentSupply <= 10
+          ? 1.5
+          : 1.25;
+      const maxAcceptablePrice = Math.min(
+        MAX_UNIT_PRICE_CENTS,
+        Math.max(BASE_ELEMENT_PRICE_CENTS * 2, Math.round(estimatedCost * rarityPremium)),
+      );
+
+      if (order.price > maxAcceptablePrice) continue;
+
+      const ageScore = Math.min(ageMs / (60 * 60 * 1000), 48);
+      const scarcityScore = Math.max(0, 20 - order.item.currentSupply);
+      const valueScore = maxAcceptablePrice / order.price;
+      const sellerBalance = order.agent?.account?.balance ?? STARTING_BALANCE_CENTS;
+      const lowBalanceSellerScore = Math.min(
+        40,
+        Math.max(0, (LOW_BALANCE_PRIORITY_CENTS - sellerBalance) / 250),
+      );
+      const onlineSellerScore = order.agent?.presence ? ONLINE_SELLER_SCORE_BONUS : 0;
+
+      candidates.push({
+        order,
+        remainingQuantity,
+        maxAcceptablePrice,
+        score: ageScore + scarcityScore * 0.5 + valueScore * 3 + lowBalanceSellerScore + onlineSellerScore,
+      });
+    }
+
+    candidates.sort((a, b) => b.score - a.score || a.order.price - b.order.price);
+    return candidates;
+  },
+
+  async estimateCraftCostCents(
+    itemId: string,
+    memo = new Map<string, number>(),
+    seen = new Set<string>(),
+  ): Promise<number> {
+    const cached = memo.get(itemId);
+    if (cached !== undefined) return cached;
+
+    if (seen.has(itemId)) return BASE_ELEMENT_PRICE_CENTS * 2;
+    seen.add(itemId);
+
+    const item = await db.query.items.findFirst({
+      where: eq(items.id, itemId),
+    });
+
+    if (!item) return BASE_ELEMENT_PRICE_CENTS * 2;
+
+    if (item.category === 'base_element') {
+      memo.set(itemId, item.basePrice || BASE_ELEMENT_PRICE_CENTS);
+      return item.basePrice || BASE_ELEMENT_PRICE_CENTS;
+    }
+
+    if (item.category !== 'crafted') {
+      const basePrice = Math.max(item.basePrice, BASE_ELEMENT_PRICE_CENTS);
+      memo.set(itemId, basePrice);
+      return basePrice;
+    }
+
+    const recipe = item.recipe as { ingredient1?: string; ingredient2?: string } | null;
+    if (!recipe?.ingredient1 || !recipe?.ingredient2) {
+      const fallback = Math.max(item.basePrice, BASE_ELEMENT_PRICE_CENTS * 2);
+      memo.set(itemId, fallback);
+      return fallback;
+    }
+
+    const ingredient1Cost = await this.estimateCraftCostCents(recipe.ingredient1, memo, new Set(seen));
+    const ingredient2Cost = await this.estimateCraftCostCents(recipe.ingredient2, memo, new Set(seen));
+    const cost = ingredient1Cost + ingredient2Cost;
+
+    memo.set(itemId, cost);
+    return cost;
+  },
+};

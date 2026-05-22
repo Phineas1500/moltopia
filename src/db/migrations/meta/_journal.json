@@ -64,6 +64,13 @@
       "when": 1771265930497,
       "tag": "0008_simple_kronos",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779476961437,
+      "tag": "0009_world_treasury",
+      "breakpoints": true
     }
   ]
 }

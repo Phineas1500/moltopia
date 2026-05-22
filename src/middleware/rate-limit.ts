@@ -1,17 +1,8 @@
 import { Context, Next } from 'hono';
-import { createClient } from 'redis';
 import { env } from '../env.js';
+import { tryGetRedis } from '../services/cache.service.js';
 
-// Redis client for rate limiting
-let redisClient: ReturnType<typeof createClient> | null = null;
-
-async function getRedisClient() {
-  if (!redisClient) {
-    redisClient = createClient({ url: env.REDIS_URL });
-    await redisClient.connect();
-  }
-  return redisClient;
-}
+const localRateLimitBuckets = new Map<string, number[]>();
 
 /**
  * Rate limiting middleware using Redis
@@ -26,10 +17,34 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
     return;
   }
 
-  const redis = await getRedisClient();
   const key = `ratelimit:${agentId}`;
   const now = Date.now();
   const windowMs = 60 * 1000; // 1 minute
+  const redis = await tryGetRedis('rate limit');
+
+  if (!redis) {
+    const recent = (localRateLimitBuckets.get(key) ?? []).filter((timestamp) => timestamp > now - windowMs);
+    recent.push(now);
+    localRateLimitBuckets.set(key, recent);
+
+    const count = recent.length;
+    if (count > env.API_RATE_LIMIT_PER_MINUTE) {
+      return c.json(
+        {
+          success: false,
+          error: 'Rate limit exceeded',
+          message: `Maximum ${env.API_RATE_LIMIT_PER_MINUTE} requests per minute`,
+        },
+        429
+      );
+    }
+
+    c.header('X-RateLimit-Limit', env.API_RATE_LIMIT_PER_MINUTE.toString());
+    c.header('X-RateLimit-Remaining', (env.API_RATE_LIMIT_PER_MINUTE - count).toString());
+
+    await next();
+    return;
+  }
 
   // Use Redis sorted set to track requests in time window
   const multi = redis.multi();
@@ -72,8 +87,5 @@ export async function rateLimitMiddleware(c: Context, next: Next) {
  * Close Redis connection
  */
 export async function closeRateLimitRedis() {
-  if (redisClient) {
-    await redisClient.quit();
-    redisClient = null;
-  }
+  localRateLimitBuckets.clear();
 }

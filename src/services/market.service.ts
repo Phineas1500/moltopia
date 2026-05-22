@@ -1,7 +1,8 @@
 import { db } from '../db/index.js';
-import { marketOrders, marketTrades, items, inventory, accounts, agents } from '../db/schema.js';
+import { marketOrders, marketTrades, items, inventory, accounts, agents, transactions } from '../db/schema.js';
 import { eq, and, or, sql, desc, asc, ne } from 'drizzle-orm';
 import { PresenceService } from './presence.service.js';
+import { SYSTEM_AGENT_ID } from '../constants/economy.js';
 
 const EXCHANGE_LOCATION_ID = 'loc_exchange';
 
@@ -16,8 +17,9 @@ export const MarketService = {
     price: number; // In cents
     quantity: number;
     expiresInHours?: number;
+    skipPresence?: boolean;
   }) {
-    const { agentId, itemId, orderType, price, quantity, expiresInHours } = data;
+    const { agentId, itemId, orderType, price, quantity, expiresInHours, skipPresence } = data;
 
     if (price <= 0) throw new Error('Price must be positive');
     if (quantity <= 0) throw new Error('Quantity must be positive');
@@ -103,8 +105,10 @@ export const MarketService = {
       ? new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
       : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // Default 7 days
 
-    // Move agent to The Exchange
-    await PresenceService.moveAgent(agentId, EXCHANGE_LOCATION_ID);
+    // Move agent to The Exchange for player actions.
+    if (!skipPresence) {
+      await PresenceService.moveAgent(agentId, EXCHANGE_LOCATION_ID);
+    }
 
     // Create the order
     const [order] = await db.insert(marketOrders).values({
@@ -204,28 +208,35 @@ export const MarketService = {
           })
           .where(eq(marketOrders.id, sellOrder.id));
 
-        // Transfer items to buyer
-        const existingInv = await db.query.inventory.findFirst({
-          where: and(
-            eq(inventory.agentId, buyOrder.agentId),
-            eq(inventory.itemId, itemId)
-          ),
-        });
-
-        if (existingInv) {
-          await db
-            .update(inventory)
-            .set({ quantity: sql`${inventory.quantity} + ${tradeQuantity}` })
-            .where(eq(inventory.id, existingInv.id));
+        if (buyOrder.agentId === SYSTEM_AGENT_ID) {
+          // World demand consumes purchased items so supply actually leaves circulation.
+          await db.update(items)
+            .set({ currentSupply: sql`GREATEST(${items.currentSupply} - ${tradeQuantity}, 0)` })
+            .where(eq(items.id, itemId));
         } else {
-          const invId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          await db.insert(inventory).values({
-            id: invId,
-            agentId: buyOrder.agentId,
-            itemId,
-            quantity: tradeQuantity,
-            acquiredPrice: tradePrice,
+          // Transfer items to buyer
+          const existingInv = await db.query.inventory.findFirst({
+            where: and(
+              eq(inventory.agentId, buyOrder.agentId),
+              eq(inventory.itemId, itemId)
+            ),
           });
+
+          if (existingInv) {
+            await db
+              .update(inventory)
+              .set({ quantity: sql`${inventory.quantity} + ${tradeQuantity}` })
+              .where(eq(inventory.id, existingInv.id));
+          } else {
+            const invId = `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            await db.insert(inventory).values({
+              id: invId,
+              agentId: buyOrder.agentId,
+              itemId,
+              quantity: tradeQuantity,
+              acquiredPrice: tradePrice,
+            });
+          }
         }
 
         // Transfer money to seller (they already gave up their items)
@@ -237,6 +248,17 @@ export const MarketService = {
           })
           .where(eq(accounts.agentId, sellOrder.agentId));
 
+        await db.insert(transactions).values({
+          id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          fromAgentId: buyOrder.agentId,
+          toAgentId: sellOrder.agentId,
+          amount: tradePrice * tradeQuantity,
+          type: 'sale',
+          description: `Market sale of ${tradeQuantity}x ${itemId}`,
+          referenceId: tradeId,
+          referenceType: 'market_trade',
+        });
+
         // Refund price difference to buyer if they paid more
         const priceDiff = buyOrder.price - tradePrice;
         if (priceDiff > 0) {
@@ -247,6 +269,16 @@ export const MarketService = {
               updatedAt: new Date(),
             })
             .where(eq(accounts.agentId, buyOrder.agentId));
+
+          await db.insert(transactions).values({
+            id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            toAgentId: buyOrder.agentId,
+            amount: priceDiff * tradeQuantity,
+            type: 'refund',
+            description: `Market price improvement refund for ${tradeQuantity}x ${itemId}`,
+            referenceId: tradeId,
+            referenceType: 'market_trade',
+          });
         }
 
         // Update local state for continued matching

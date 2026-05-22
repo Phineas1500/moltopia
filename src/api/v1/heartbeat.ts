@@ -7,20 +7,38 @@ import { agents } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { getSkillVersion } from './skill.js';
 import { executeAction } from './action.js';
-import { createClient } from 'redis';
-import { env } from '../../env.js';
+import { tryGetRedis } from '../../services/cache.service.js';
 
-// Redis client for heartbeat cooldown
-let cooldownRedis: ReturnType<typeof createClient> | null = null;
-async function getCooldownRedis() {
-  if (!cooldownRedis) {
-    cooldownRedis = createClient({ url: env.REDIS_URL });
-    await cooldownRedis.connect();
-  }
-  return cooldownRedis;
-}
+// Redis is optional; keep a process-local fallback so missing Redis never
+// blocks the critical heartbeat path.
+const localHeartbeatCooldowns = new Map<string, number>();
 
 const HEARTBEAT_COOLDOWN_SECONDS = 30;
+
+async function getLastHeartbeatMs(cooldownKey: string): Promise<number | null> {
+  const redis = await tryGetRedis('heartbeat cooldown get');
+  if (redis) {
+    const value = await redis.get(cooldownKey);
+    return value ? parseInt(value) : null;
+  }
+
+  const localValue = localHeartbeatCooldowns.get(cooldownKey);
+  return localValue ?? null;
+}
+
+async function setLastHeartbeatMs(cooldownKey: string, timestampMs: number) {
+  const redis = await tryGetRedis('heartbeat cooldown set');
+  if (redis) {
+    await redis.set(cooldownKey, timestampMs.toString(), { EX: HEARTBEAT_COOLDOWN_SECONDS * 2 });
+    return;
+  }
+
+  localHeartbeatCooldowns.set(cooldownKey, timestampMs);
+  const expiresBefore = timestampMs - HEARTBEAT_COOLDOWN_SECONDS * 2 * 1000;
+  for (const [key, value] of localHeartbeatCooldowns) {
+    if (value < expiresBefore) localHeartbeatCooldowns.delete(key);
+  }
+}
 
 const heartbeat = new Hono();
 
@@ -58,14 +76,13 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   await PresenceService.updatePresence(agentId, activity);
 
   // Per-agent heartbeat cooldown: prevent spamming multiple heartbeats per cycle
-  const redis = await getCooldownRedis();
   const cooldownKey = `heartbeat_cooldown:${agentId}`;
-  const lastHeartbeat = await redis.get(cooldownKey);
+  const lastHeartbeat = await getLastHeartbeatMs(cooldownKey);
   const now = Date.now();
-  const onCooldown = lastHeartbeat && (now - parseInt(lastHeartbeat)) < HEARTBEAT_COOLDOWN_SECONDS * 1000;
+  const onCooldown = lastHeartbeat && (now - lastHeartbeat) < HEARTBEAT_COOLDOWN_SECONDS * 1000;
 
   if (onCooldown) {
-    const waitSeconds = Math.ceil(HEARTBEAT_COOLDOWN_SECONDS - (now - parseInt(lastHeartbeat!)) / 1000);
+    const waitSeconds = Math.ceil(HEARTBEAT_COOLDOWN_SECONDS - (now - lastHeartbeat) / 1000);
     return c.json({
       success: true,
       cooldown: true,
@@ -75,7 +92,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   }
 
   // Record this heartbeat timestamp
-  await redis.set(cooldownKey, now.toString(), { EX: HEARTBEAT_COOLDOWN_SECONDS * 2 });
+  await setLastHeartbeatMs(cooldownKey, now);
 
   // Calculate delta
   const delta = await PresenceService.calculateDelta(agentId, since);

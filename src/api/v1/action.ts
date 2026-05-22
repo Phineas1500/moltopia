@@ -13,6 +13,7 @@ import { BountyService } from '../../services/bounty.service.js';
 import { db } from '../../db/index.js';
 import { presence, inventory, accounts, agentState, agents } from '../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
+import { RECOVERY_WORK_TASKS } from '../../constants/economy.js';
 
 // --- Zod schemas for each action's params ---
 
@@ -55,6 +56,10 @@ const marketSellSchema = z.object({
 
 const marketCancelSchema = z.object({
   orderId: z.string(),
+});
+
+const worldWorkSchema = z.object({
+  task: z.enum(RECOVERY_WORK_TASKS).optional(),
 });
 
 const tradeProposeSchema = z.object({
@@ -326,6 +331,18 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       const result = await MarketService.cancelOrder(params.orderId, agentId);
 
       await AgentStateService.recordAction(agentId, 'market');
+
+      return result;
+    },
+  },
+
+  world_work: {
+    schema: worldWorkSchema,
+    isMutating: true,
+    handler: async (agentId, params) => {
+      const result = await EconomyService.claimWorldWork(agentId, params.task);
+
+      await AgentStateService.recordAction(agentId, 'work');
 
       return result;
     },

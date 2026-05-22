@@ -10,7 +10,7 @@ import { IncomingMessage } from 'http';
 import { db } from '../../db/index.js';
 import { agents, presence, locations } from '../../db/schema.js';
 import { eq } from 'drizzle-orm';
-import { getRedis } from '../../services/cache.service.js';
+import { tryGetRedis } from '../../services/cache.service.js';
 import {
   WSEvent,
   createEvent,
@@ -357,7 +357,12 @@ export function createWebSocketServer(port: number): WebSocketServer {
  */
 export async function initRedisSubscriber() {
   try {
-    const redis = await getRedis();
+    const redis = await tryGetRedis('ws subscriber');
+    if (!redis) {
+      console.warn('[WS] Redis unavailable; cross-process WebSocket pub/sub disabled');
+      return;
+    }
+
     const subscriber = redis.duplicate();
     await subscriber.connect();
 

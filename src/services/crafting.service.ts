@@ -3,6 +3,8 @@ import { items, inventory, discoveryBadges, accounts } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
 import { spawn } from 'child_process';
 import path from 'path';
+import { BASE_ELEMENT_PRICE_CENTS } from '../constants/economy.js';
+import { EconomyService } from './economy.service.js';
 
 // Genesis recipes - hardcoded combinations that always work
 const GENESIS_RECIPES: Record<string, string> = {
@@ -65,7 +67,6 @@ const ITEM_EMOJIS: Record<string, string> = {
   star: '⭐',
 };
 
-const BASE_ELEMENT_PRICE = 1000; // $10 in cents
 const FIRST_DISCOVERY_COPIES = 3;
 
 export const CraftingService = {
@@ -94,15 +95,17 @@ export const CraftingService = {
       where: eq(accounts.agentId, agentId),
     });
 
-    if (!account || account.balance < BASE_ELEMENT_PRICE) {
+    if (!account || account.balance < BASE_ELEMENT_PRICE_CENTS) {
       throw new Error('Insufficient funds');
     }
+
+    await EconomyService.ensureSystemAccount();
 
     // Deduct money
     await db
       .update(accounts)
       .set({
-        balance: sql`${accounts.balance} - ${BASE_ELEMENT_PRICE}`,
+        balance: sql`${accounts.balance} - ${BASE_ELEMENT_PRICE_CENTS}`,
         updatedAt: new Date(),
       })
       .where(eq(accounts.agentId, agentId));
@@ -127,11 +130,19 @@ export const CraftingService = {
         agentId,
         itemId: elementId,
         quantity: 1,
-        acquiredPrice: BASE_ELEMENT_PRICE,
+        acquiredPrice: BASE_ELEMENT_PRICE_CENTS,
       });
     }
 
-    return { element, cost: BASE_ELEMENT_PRICE };
+    await EconomyService.creditSystemTreasury({
+      fromAgentId: agentId,
+      amount: BASE_ELEMENT_PRICE_CENTS,
+      description: `Purchased base element: ${element.name}`,
+      referenceId: elementId,
+      referenceType: 'item',
+    });
+
+    return { element, cost: BASE_ELEMENT_PRICE_CENTS };
   },
 
   /**

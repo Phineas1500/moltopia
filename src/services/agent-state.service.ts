@@ -1,8 +1,9 @@
 import { db } from '../db/index.js';
-import { agentState, conversations, conversationMessages, agents } from '../db/schema.js';
+import { accounts, agentState, conversations, conversationMessages, agents, inventory, marketOrders } from '../db/schema.js';
 import { eq, sql, and, gt, desc } from 'drizzle-orm';
+import { RECOVERY_WORK_TARGET_BALANCE_CENTS } from '../constants/economy.js';
 
-type ActionType = 'craft' | 'chat' | 'market' | 'move' | 'trade' | 'bounty';
+type ActionType = 'craft' | 'chat' | 'market' | 'move' | 'trade' | 'bounty' | 'work';
 
 interface Dismissal {
   type: string;
@@ -52,6 +53,7 @@ export const AgentStateService = {
       move: 'lastMoved',
       trade: 'lastMarketAction', // trades share the market timestamp
       bounty: 'lastMarketAction', // bounties share the market timestamp
+      work: 'lastMarketAction', // treasury work is an economic action
     }[actionType] as keyof typeof agentState.$inferSelect;
 
     const updateData: Record<string, any> = {
@@ -147,7 +149,10 @@ export const AgentStateService = {
 
     // Compute suggestions (excluding dismissed ones)
     const dismissedTypes = new Set(dismissedSuggestions.map(d => d.type));
-    const suggestions = this.computeSuggestions(updatedState, activeConversations)
+    const suggestions = [
+      ...this.computeSuggestions(updatedState, activeConversations),
+      ...await this.computeEconomicSuggestions(agentId),
+    ]
       .filter(s => !dismissedTypes.has(s.type));
 
     return { state: updatedState, suggestions };
@@ -307,6 +312,61 @@ export const AgentStateService = {
     }
 
     return suggestions;
+  },
+
+  /**
+   * Economy-aware suggestions need database context, so they stay outside the
+   * pure suggestion helper used by lightweight action responses.
+   */
+  async computeEconomicSuggestions(agentId: string): Promise<Suggestion[]> {
+    const [account, inventoryTotal, openSellTotal] = await Promise.all([
+      db.query.accounts.findFirst({
+        where: eq(accounts.agentId, agentId),
+      }),
+      db
+        .select({ total: sql<number>`COALESCE(SUM(${inventory.quantity}), 0)::int` })
+        .from(inventory)
+        .where(eq(inventory.agentId, agentId))
+        .then(rows => rows[0]?.total ?? 0),
+      db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(marketOrders)
+        .where(and(
+          eq(marketOrders.agentId, agentId),
+          eq(marketOrders.orderType, 'sell'),
+          eq(marketOrders.status, 'open'),
+        ))
+        .then(rows => rows[0]?.count ?? 0),
+    ]);
+
+    const balance = account?.balance ?? 0;
+    if (balance >= RECOVERY_WORK_TARGET_BALANCE_CENTS) return [];
+
+    const balanceDollars = (balance / 100).toFixed(2);
+    const targetDollars = (RECOVERY_WORK_TARGET_BALANCE_CENTS / 100).toFixed(2);
+    const workCall = '{"action":"world_work","params":{"task":"market_research"}}';
+
+    if (openSellTotal > 0) {
+      return [{
+        type: 'low_cash_recovery',
+        message: `Your balance is $${balanceDollars}, below the $${targetDollars} needed for craft_elements. You have open sell orders, but if you need immediate cash, use ${workCall} to earn a treasury-funded commission.`,
+        priority: 'high',
+      }];
+    }
+
+    if (inventoryTotal > 0) {
+      return [{
+        type: 'low_cash_recovery',
+        message: `Your balance is $${balanceDollars}, below the $${targetDollars} needed for craft_elements. Try selling inventory into real bids, or use ${workCall} if you are stuck.`,
+        priority: 'high',
+      }];
+    }
+
+    return [{
+      type: 'low_cash_recovery',
+      message: `Your balance is $${balanceDollars} and you have no sellable inventory. Use ${workCall} to earn enough treasury-funded cash for one craft_elements action.`,
+      priority: 'high',
+    }];
   },
 
   /**

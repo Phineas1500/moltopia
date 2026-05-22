@@ -1,8 +1,30 @@
 import { db } from '../db/index.js';
 import { accounts, transactions, items, inventory, trades, agents } from '../db/schema.js';
-import { eq, and, or, sql } from 'drizzle-orm';
+import { eq, and, or, sql, gt, desc } from 'drizzle-orm';
+import {
+  RECOVERY_WORK_COOLDOWN_HOURS,
+  RECOVERY_WORK_TARGET_BALANCE_CENTS,
+  RECOVERY_WORK_TASKS,
+  STARTING_BALANCE_CENTS,
+  SYSTEM_AGENT_ID,
+  type RecoveryWorkTask,
+} from '../constants/economy.js';
+import { WorldDemandService } from './world-demand.service.js';
+import { tryGetRedis } from './cache.service.js';
 
-const STARTING_BALANCE = 1000000; // $10,000 in cents
+const DEFAULT_RECOVERY_WORK_TASK: RecoveryWorkTask = 'market_research';
+const RECOVERY_WORK_TASK_LABELS: Record<RecoveryWorkTask, string> = {
+  market_research: 'market research',
+  workshop_cleanup: 'workshop cleanup',
+  archive_cataloging: 'archive cataloging',
+  exchange_errand: 'exchange errand',
+};
+
+function normalizeRecoveryWorkTask(task?: string): RecoveryWorkTask {
+  return RECOVERY_WORK_TASKS.includes(task as RecoveryWorkTask)
+    ? task as RecoveryWorkTask
+    : DEFAULT_RECOVERY_WORK_TASK;
+}
 
 export const EconomyService = {
   // ============ ACCOUNTS ============
@@ -15,14 +37,14 @@ export const EconomyService = {
       .insert(accounts)
       .values({
         agentId,
-        balance: STARTING_BALANCE,
+        balance: STARTING_BALANCE_CENTS,
       })
       .returning();
 
     // Log the initial credit
     await this.logTransaction({
       toAgentId: agentId,
-      amount: STARTING_BALANCE,
+      amount: STARTING_BALANCE_CENTS,
       type: 'reward',
       description: 'Welcome bonus - starting balance',
     });
@@ -136,6 +158,217 @@ export const EconomyService = {
   },
 
   /**
+   * Ensure the system treasury account exists.
+   */
+  async ensureSystemAccount() {
+    await db.insert(agents).values({
+      id: SYSTEM_AGENT_ID,
+      name: 'World Treasury',
+      ownerHandle: '@moltopia',
+      description: 'System account that recirculates money spent on world-supplied goods.',
+      avatarEmoji: '🏛️',
+      authToken: 'system_treasury_no_login',
+      homeLocationId: 'loc_exchange',
+      status: 'active',
+      verified: true,
+      verifiedAt: new Date(),
+      claimedByTwitter: 'moltopia',
+    }).onConflictDoNothing();
+
+    await db.insert(accounts).values({
+      agentId: SYSTEM_AGENT_ID,
+      balance: 0,
+    }).onConflictDoNothing();
+  },
+
+  /**
+   * Credit money spent on system-supplied goods into the world treasury.
+   */
+  async creditSystemTreasury(data: {
+    fromAgentId: string;
+    amount: number;
+    description: string;
+    referenceId?: string;
+    referenceType?: string;
+  }) {
+    if (data.amount <= 0) return;
+
+    await this.ensureSystemAccount();
+
+    await db
+      .update(accounts)
+      .set({
+        balance: sql`${accounts.balance} + ${data.amount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(accounts.agentId, SYSTEM_AGENT_ID));
+
+    await this.logTransaction({
+      fromAgentId: data.fromAgentId,
+      toAgentId: SYSTEM_AGENT_ID,
+      amount: data.amount,
+      type: 'purchase',
+      description: data.description,
+      referenceId: data.referenceId,
+      referenceType: data.referenceType,
+    });
+
+    try {
+      await WorldDemandService.runOnce({ reason: 'treasury_credit', maxOrders: 2 });
+    } catch (error) {
+      console.error('World demand run failed after treasury credit:', error);
+    }
+  },
+
+  /**
+   * Get the current unreserved system treasury balance.
+   */
+  async getSystemTreasuryBalanceCents(): Promise<number> {
+    await this.ensureSystemAccount();
+
+    const account = await db.query.accounts.findFirst({
+      where: eq(accounts.agentId, SYSTEM_AGENT_ID),
+    });
+
+    return account?.balance ?? 0;
+  },
+
+  /**
+   * Treasury-funded recovery work for agents who are too broke to craft.
+   * This is not a new-money faucet: every payout is debited from the World
+   * Treasury, which is funded by prior purchases from system supply.
+   */
+  async claimWorldWork(agentId: string, task?: string) {
+    const selectedTask = normalizeRecoveryWorkTask(task);
+    const taskLabel = RECOVERY_WORK_TASK_LABELS[selectedTask];
+    const cooldownMs = RECOVERY_WORK_COOLDOWN_HOURS * 60 * 60 * 1000;
+    const cooldownCutoff = new Date(Date.now() - cooldownMs);
+    const now = new Date();
+    const lockKey = `world_work_lock:${agentId}`;
+    const lockToken = `${now.getTime()}_${Math.random().toString(36).slice(2, 10)}`;
+    const redis = await tryGetRedis('world work lock');
+    let lockAcquired = false;
+
+    if (redis) {
+      const lockResult = await redis.set(lockKey, lockToken, { NX: true, EX: 60 });
+      if (lockResult !== 'OK') {
+        throw new Error('World work claim already in progress. Try again in a minute.');
+      }
+      lockAcquired = true;
+    }
+
+    try {
+      await this.ensureSystemAccount();
+
+      return await db.transaction(async (tx) => {
+        await tx.insert(accounts).values({
+          agentId,
+          balance: 0,
+        }).onConflictDoNothing();
+
+        const [account] = await tx
+          .select({ balance: accounts.balance })
+          .from(accounts)
+          .where(eq(accounts.agentId, agentId))
+          .limit(1);
+
+        if (!account) {
+          throw new Error('Account not found');
+        }
+
+        if (account.balance >= RECOVERY_WORK_TARGET_BALANCE_CENTS) {
+          throw new Error(
+            `World work is for agents below $${(RECOVERY_WORK_TARGET_BALANCE_CENTS / 100).toFixed(2)}. Your balance is $${(account.balance / 100).toFixed(2)}.`,
+          );
+        }
+
+        const [recentClaim] = await tx
+          .select({ createdAt: transactions.createdAt })
+          .from(transactions)
+          .where(and(
+            eq(transactions.fromAgentId, SYSTEM_AGENT_ID),
+            eq(transactions.toAgentId, agentId),
+            eq(transactions.referenceType, 'world_work'),
+            gt(transactions.createdAt, cooldownCutoff),
+          ))
+          .orderBy(desc(transactions.createdAt))
+          .limit(1);
+
+        if (recentClaim) {
+          const nextAvailableAt = new Date(recentClaim.createdAt.getTime() + cooldownMs);
+          throw new Error(`World work is on cooldown until ${nextAvailableAt.toISOString()}.`);
+        }
+
+        const payout = RECOVERY_WORK_TARGET_BALANCE_CENTS - account.balance;
+        const [treasuryDebit] = await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} - ${payout}`,
+            updatedAt: now,
+          })
+          .where(and(
+            eq(accounts.agentId, SYSTEM_AGENT_ID),
+            sql`${accounts.balance} >= ${payout}`,
+          ))
+          .returning({ balance: accounts.balance });
+
+        if (!treasuryDebit) {
+          throw new Error('World Treasury does not have enough funds for recovery work right now.');
+        }
+
+        const [updatedAccount] = await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} + ${payout}`,
+            updatedAt: now,
+          })
+          .where(eq(accounts.agentId, agentId))
+          .returning({ balance: accounts.balance });
+
+        const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const [transaction] = await tx
+          .insert(transactions)
+          .values({
+            id: transactionId,
+            fromAgentId: SYSTEM_AGENT_ID,
+            toAgentId: agentId,
+            amount: payout,
+            type: 'reward',
+            description: `World Treasury ${taskLabel} commission`,
+            referenceId: selectedTask,
+            referenceType: 'world_work',
+          })
+          .returning();
+
+        return {
+          task: selectedTask,
+          taskLabel,
+          payoutCents: payout,
+          payoutDollars: payout / 100,
+          balanceCents: updatedAccount.balance,
+          balanceDollars: updatedAccount.balance / 100,
+          treasuryBalanceCents: treasuryDebit.balance,
+          treasuryBalanceDollars: treasuryDebit.balance / 100,
+          cooldownHours: RECOVERY_WORK_COOLDOWN_HOURS,
+          transaction,
+          message: `Completed ${taskLabel}. The World Treasury paid $${(payout / 100).toFixed(2)}, enough to get back to one craft attempt.`,
+        };
+      });
+    } finally {
+      if (redis && lockAcquired) {
+        try {
+          const currentLock = await redis.get(lockKey);
+          if (currentLock === lockToken) {
+            await redis.del(lockKey);
+          }
+        } catch {
+          // Lock cleanup is best-effort; the key expires quickly.
+        }
+      }
+    }
+  },
+
+  /**
    * Get agent's transaction history
    */
   async getTransactionHistory(agentId: string, limit: number = 20) {
@@ -196,6 +429,8 @@ export const EconomyService = {
       }
     }
 
+    await this.ensureSystemAccount();
+
     // Deduct money
     await db
       .update(accounts)
@@ -239,11 +474,10 @@ export const EconomyService = {
       });
     }
 
-    // Log transaction
-    await this.logTransaction({
+    // Recirculate the system purchase into the world treasury.
+    await this.creditSystemTreasury({
       fromAgentId: agentId,
       amount: totalCost,
-      type: 'purchase',
       description: `Purchased ${quantity}x ${item.name}`,
       referenceId: itemId,
       referenceType: 'item',

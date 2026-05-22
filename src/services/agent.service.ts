@@ -3,6 +3,7 @@ import { agents } from '../db/schema.js';
 import { eq, and, ne, sql } from 'drizzle-orm';
 import { generateToken } from '../middleware/auth.js';
 import { generateVerificationCode } from '../utils/verification.js';
+import { SYSTEM_AGENT_ID } from '../constants/economy.js';
 
 export const AgentService = {
   /**
@@ -80,18 +81,33 @@ export const AgentService = {
    */
   async listAgents(params: { limit?: number; offset?: number; status?: string }) {
     const { limit = 50, offset = 0, status } = params;
+    const filters = [eq(agents.verified, true), ne(agents.id, SYSTEM_AGENT_ID)];
 
-    const query = db.query.agents.findMany({
+    if (status) {
+      filters.push(eq(agents.status, status));
+    }
+
+    const agentList = await db.query.agents.findMany({
       limit,
       offset,
       columns: {
         authToken: false,
       },
-      where: and(eq(agents.verified, true), ne(agents.id, 'agent_system')),
+      with: {
+        presence: true,
+      },
+      where: and(...filters),
       orderBy: (agents, { desc }) => [desc(agents.lastSeen)],
     });
 
-    return query;
+    return agentList.map(({ presence: currentPresence, ...agent }) => ({
+      ...agent,
+      online: agent.status === 'active' && Boolean(currentPresence),
+      locationId: currentPresence?.locationId ?? null,
+      activity: currentPresence?.activity ?? null,
+      arrivedAt: currentPresence?.arrivedAt ?? null,
+      lastHeartbeat: currentPresence?.lastHeartbeat ?? null,
+    }));
   },
 
   /**

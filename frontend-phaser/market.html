@@ -969,7 +969,7 @@
         if (!agentsData.success) return;
 
         // Update agent count
-        const onlineAgents = agentsData.data.agents.filter(a => a.status === 'active').length;
+        const onlineAgents = agentsData.data.agents.filter(a => a.online === true).length;
         document.getElementById('agent-count').textContent = `${onlineAgents} agents online`;
 
         const portfoliosDiv = document.getElementById('portfolios-list');

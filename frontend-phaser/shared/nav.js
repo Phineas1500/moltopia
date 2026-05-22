@@ -151,7 +151,7 @@ if (typeof fetchAgentCount === 'undefined') {
       const response = await fetch('/api/v1/agents');
       const data = await response.json();
       if (data.success) {
-        updateAgentCount(data.data.agents.length);
+        updateAgentCount(data.data.agents.filter(agent => agent.online === true).length);
       }
     } catch (e) {
       console.error('Failed to fetch agent count:', e);

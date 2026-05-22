@@ -479,7 +479,8 @@
       .then(r => r.json())
       .then(data => {
         if (data.success) {
-          document.getElementById('agent-count').textContent = data.data.agents.length + ' agents online';
+          const online = data.data.agents.filter(agent => agent.online === true).length;
+          document.getElementById('agent-count').textContent = online + ' agents online';
         }
       });
   </script>
