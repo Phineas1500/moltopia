@@ -14,6 +14,17 @@ import { tryGetRedis } from '../../services/cache.service.js';
 const localHeartbeatCooldowns = new Map<string, number>();
 
 const HEARTBEAT_COOLDOWN_SECONDS = 30;
+const MAX_ACTIVITY_LENGTH = 100;
+
+function normalizeActivity(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+
+  const activity = typeof value === 'string'
+    ? value
+    : JSON.stringify(value);
+
+  return activity.slice(0, MAX_ACTIVITY_LENGTH);
+}
 
 async function getLastHeartbeatMs(cooldownKey: string): Promise<number | null> {
   const redis = await tryGetRedis('heartbeat cooldown get');
@@ -56,7 +67,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   // Get 'since' parameter (when was last heartbeat)
   const body = await c.req.json().catch(() => ({}));
   const since = body.since ? new Date(body.since) : new Date(Date.now() - 30 * 60 * 1000); // Default: 30 min ago
-  const activity = body.activity;
+  const activity = normalizeActivity(body.activity);
 
   // New optional fields for agent state
   const currentGoal = body.currentGoal as string | undefined;
