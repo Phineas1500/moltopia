@@ -3,11 +3,11 @@ import { accounts, items, marketOrders, marketTrades, transactions } from '../db
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { BASE_ELEMENT_PRICE_CENTS, STARTING_BALANCE_CENTS, SYSTEM_AGENT_ID } from '../constants/economy.js';
 import { MarketService } from './market.service.js';
+import { WorldDemandPricingService } from './world-demand-pricing.service.js';
 
 const CANDIDATE_LIMIT = 200;
 const DEFAULT_MAX_ORDERS = 3;
 const MAX_UNITS_PER_ORDER = 3;
-const MAX_UNIT_PRICE_CENTS = 25000; // $250
 const MIN_SELL_ORDER_AGE_MS = 15 * 60 * 1000;
 const TREASURY_SPEND_FRACTION = 0.9;
 const LOW_BALANCE_PRIORITY_CENTS = 10000; // $100
@@ -347,29 +347,7 @@ export const WorldDemandService = {
   },
 
   async getPricingGuidance(itemId: string, memo = new Map<string, number>()) {
-    const item = await db.query.items.findFirst({
-      where: eq(items.id, itemId),
-    });
-
-    if (!item || item.category !== 'crafted') {
-      return {
-        itemId,
-        treasuryMaxBuyCents: null,
-        treasuryMaxBuyDollars: null,
-        suggestedSellPriceCents: null,
-        suggestedSellPriceDollars: null,
-      };
-    }
-
-    const treasuryMaxBuyCents = await this.getMaxAcceptablePriceCents(item, memo);
-
-    return {
-      itemId,
-      treasuryMaxBuyCents,
-      treasuryMaxBuyDollars: treasuryMaxBuyCents / 100,
-      suggestedSellPriceCents: treasuryMaxBuyCents,
-      suggestedSellPriceDollars: treasuryMaxBuyCents / 100,
-    };
+    return WorldDemandPricingService.getPricingGuidance(itemId, memo);
   },
 
   async nudgeLowBalanceSellOrders(minOrderAgeMs = MIN_SELL_ORDER_AGE_MS): Promise<PriceAdjustment[]> {
@@ -433,17 +411,7 @@ export const WorldDemandService = {
     item: typeof items.$inferSelect,
     memo = new Map<string, number>(),
   ): Promise<number> {
-    const estimatedCost = await this.estimateCraftCostCents(item.id, memo);
-    const rarityPremium = item.currentSupply <= 3
-      ? 1.8
-      : item.currentSupply <= 10
-        ? 1.5
-        : 1.25;
-
-    return Math.min(
-      MAX_UNIT_PRICE_CENTS,
-      Math.max(BASE_ELEMENT_PRICE_CENTS * 2, Math.round(estimatedCost * rarityPremium)),
-    );
+    return WorldDemandPricingService.getMaxAcceptablePriceCents(item, memo);
   },
 
   async estimateCraftCostCents(
@@ -451,41 +419,6 @@ export const WorldDemandService = {
     memo = new Map<string, number>(),
     seen = new Set<string>(),
   ): Promise<number> {
-    const cached = memo.get(itemId);
-    if (cached !== undefined) return cached;
-
-    if (seen.has(itemId)) return BASE_ELEMENT_PRICE_CENTS * 2;
-    seen.add(itemId);
-
-    const item = await db.query.items.findFirst({
-      where: eq(items.id, itemId),
-    });
-
-    if (!item) return BASE_ELEMENT_PRICE_CENTS * 2;
-
-    if (item.category === 'base_element') {
-      memo.set(itemId, item.basePrice || BASE_ELEMENT_PRICE_CENTS);
-      return item.basePrice || BASE_ELEMENT_PRICE_CENTS;
-    }
-
-    if (item.category !== 'crafted') {
-      const basePrice = Math.max(item.basePrice, BASE_ELEMENT_PRICE_CENTS);
-      memo.set(itemId, basePrice);
-      return basePrice;
-    }
-
-    const recipe = item.recipe as { ingredient1?: string; ingredient2?: string } | null;
-    if (!recipe?.ingredient1 || !recipe?.ingredient2) {
-      const fallback = Math.max(item.basePrice, BASE_ELEMENT_PRICE_CENTS * 2);
-      memo.set(itemId, fallback);
-      return fallback;
-    }
-
-    const ingredient1Cost = await this.estimateCraftCostCents(recipe.ingredient1, memo, new Set(seen));
-    const ingredient2Cost = await this.estimateCraftCostCents(recipe.ingredient2, memo, new Set(seen));
-    const cost = ingredient1Cost + ingredient2Cost;
-
-    memo.set(itemId, cost);
-    return cost;
+    return WorldDemandPricingService.estimateCraftCostCents(itemId, memo, seen);
   },
 };

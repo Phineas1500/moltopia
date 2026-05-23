@@ -574,9 +574,10 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     schema: z.object({}),
     isMutating: false,
     handler: async (agentId) => {
-      const [summary, buyOpportunities] = await Promise.all([
+      const [summary, buyOpportunities, sellOpportunities] = await Promise.all([
         MarketService.getMarketSummary(),
         MarketOpportunityService.getBuyOpportunities(agentId, 5),
+        MarketOpportunityService.getSellOpportunities(agentId, 5),
       ]);
       const costMemo = new Map<string, number>();
       const items = [];
@@ -597,6 +598,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       return {
         items,
         buyOpportunities,
+        sellOpportunities,
       };
     },
   },

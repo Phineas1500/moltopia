@@ -1,7 +1,8 @@
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { accounts, agents, items, marketOrders } from '../db/schema.js';
+import { accounts, agents, inventory, items, marketOrders } from '../db/schema.js';
 import { RECOVERY_WORK_TARGET_BALANCE_CENTS, SYSTEM_AGENT_ID } from '../constants/economy.js';
+import { WorldDemandPricingService } from './world-demand-pricing.service.js';
 
 const MIN_BUY_OPPORTUNITY_BALANCE_CENTS = RECOVERY_WORK_TARGET_BALANCE_CENTS * 2;
 const MAX_BUY_OPPORTUNITY_SPEND_CENTS = 10000; // $100
@@ -24,6 +25,24 @@ export interface MarketBuyOpportunity {
   priceDollars: number;
   remainingQuantity: number;
   createdAt: Date;
+  reason: string;
+}
+
+export interface MarketSellOpportunity {
+  item: {
+    id: string;
+    name: string;
+    emoji: string | null;
+    category: string;
+    currentSupply: number;
+  };
+  quantityOwned: number;
+  bestBidCents: number | null;
+  bestBidDollars: number | null;
+  treasuryMaxBuyCents: number | null;
+  treasuryMaxBuyDollars: number | null;
+  suggestedSellPriceCents: number;
+  suggestedSellPriceDollars: number;
   reason: string;
 }
 
@@ -129,5 +148,72 @@ export const MarketOpportunityService = {
     }
 
     return opportunities;
+  },
+
+  async getSellOpportunities(agentId: string, maxResults = 5): Promise<MarketSellOpportunity[]> {
+    const inventoryRows = await db
+      .select({
+        itemId: items.id,
+        itemName: items.name,
+        itemEmoji: items.emoji,
+        itemCategory: items.category,
+        itemCurrentSupply: items.currentSupply,
+        quantityOwned: inventory.quantity,
+      })
+      .from(inventory)
+      .innerJoin(items, eq(inventory.itemId, items.id))
+      .where(and(
+        eq(inventory.agentId, agentId),
+        eq(items.tradeable, true),
+        eq(items.category, 'crafted'),
+        sql`${inventory.quantity} > 0`,
+      ))
+      .limit(Math.max(maxResults * 2, maxResults));
+
+    const memo = new Map<string, number>();
+    const opportunities: MarketSellOpportunity[] = [];
+
+    for (const row of inventoryRows) {
+      const [bestBid] = await db
+        .select({
+          priceCents: sql<number>`MAX(${marketOrders.price})::int`,
+        })
+        .from(marketOrders)
+        .where(and(
+          eq(marketOrders.itemId, row.itemId),
+          eq(marketOrders.orderType, 'buy'),
+          eq(marketOrders.status, 'open'),
+          ne(marketOrders.agentId, agentId),
+        ));
+
+      const guidance = await WorldDemandPricingService.getPricingGuidance(row.itemId, memo);
+      const bestBidCents = bestBid?.priceCents ?? null;
+      const suggestedSellPriceCents = Math.max(bestBidCents ?? 0, guidance.suggestedSellPriceCents ?? 0);
+      if (suggestedSellPriceCents <= 0) continue;
+
+      opportunities.push({
+        item: {
+          id: row.itemId,
+          name: row.itemName,
+          emoji: row.itemEmoji,
+          category: row.itemCategory,
+          currentSupply: row.itemCurrentSupply,
+        },
+        quantityOwned: row.quantityOwned,
+        bestBidCents,
+        bestBidDollars: bestBidCents ? bestBidCents / 100 : null,
+        treasuryMaxBuyCents: guidance.treasuryMaxBuyCents,
+        treasuryMaxBuyDollars: guidance.treasuryMaxBuyDollars,
+        suggestedSellPriceCents,
+        suggestedSellPriceDollars: suggestedSellPriceCents / 100,
+        reason: bestBidCents && bestBidCents >= suggestedSellPriceCents
+          ? 'There is an open bid at this price; selling here should fill immediately.'
+          : 'This price is eligible for World Treasury demand if the order waits on the market.',
+      });
+    }
+
+    return opportunities
+      .sort((a, b) => b.suggestedSellPriceCents - a.suggestedSellPriceCents || a.item.name.localeCompare(b.item.name))
+      .slice(0, maxResults);
   },
 };

@@ -325,6 +325,26 @@ export const AgentStateService = {
     });
 
     const balance = account?.balance ?? 0;
+    const [sellOpportunity] = await MarketOpportunityService.getSellOpportunities(agentId, 1);
+    if (sellOpportunity && balance < RECOVERY_WORK_TARGET_BALANCE_CENTS * 5) {
+      const balanceDollars = (balance / 100).toFixed(2);
+      const priceDollars = sellOpportunity.suggestedSellPriceDollars.toFixed(2);
+      const sellCall = JSON.stringify({
+        action: 'market_sell',
+        params: {
+          itemId: sellOpportunity.item.id,
+          price: sellOpportunity.suggestedSellPriceDollars,
+          quantity: 1,
+        },
+      });
+
+      return [{
+        type: 'market_sell_opportunity',
+        message: `Your balance is $${balanceDollars}, and you own ${sellOpportunity.item.name}. List 1 for $${priceDollars} with ${sellCall}. ${sellOpportunity.reason}`,
+        priority: balance <= RECOVERY_WORK_TARGET_BALANCE_CENTS ? 'high' : 'medium',
+      }];
+    }
+
     if (balance >= RECOVERY_WORK_TARGET_BALANCE_CENTS) {
       const [opportunity] = await MarketOpportunityService.getBuyOpportunities(agentId, 1, balance);
       if (!opportunity) return [];
