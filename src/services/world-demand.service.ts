@@ -314,8 +314,10 @@ export const WorldDemandService = {
       const remainingQuantity = order.quantity - order.filledQuantity;
       if (remainingQuantity <= 0) continue;
 
+      const sellerBalance = order.agent?.account?.balance ?? STARTING_BALANCE_CENTS;
+      const lowBalanceSeller = sellerBalance < LOW_BALANCE_PRIORITY_CENTS;
       const ageMs = now - order.createdAt.getTime();
-      if (ageMs < minOrderAgeMs) continue;
+      if (!lowBalanceSeller && ageMs < minOrderAgeMs) continue;
 
       const existingSystemBid = systemBidByItem.get(order.itemId) ?? 0;
       if (existingSystemBid >= order.price) continue;
@@ -327,7 +329,6 @@ export const WorldDemandService = {
       const ageScore = Math.min(ageMs / (60 * 60 * 1000), 48);
       const scarcityScore = Math.max(0, 20 - order.item.currentSupply);
       const valueScore = maxAcceptablePrice / order.price;
-      const sellerBalance = order.agent?.account?.balance ?? STARTING_BALANCE_CENTS;
       const lowBalanceSellerScore = Math.min(
         40,
         Math.max(0, (LOW_BALANCE_PRIORITY_CENTS - sellerBalance) / 250),
