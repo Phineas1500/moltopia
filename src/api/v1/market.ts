@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { MarketService } from '../../services/market.service.js';
 import { AgentStateService } from '../../services/agent-state.service.js';
+import { WorldDemandService } from '../../services/world-demand.service.js';
 import { authMiddleware, verifiedMiddleware } from '../../middleware/auth.js';
 import { SYSTEM_AGENT_ID } from '../../constants/economy.js';
 import { z } from 'zod';
@@ -23,16 +24,27 @@ function publicTradeAgent(agentId: string, agent?: { id: string; name: string; a
  */
 market.get('/summary', async (c) => {
   const summary = await MarketService.getMarketSummary();
+  const costMemo = new Map<string, number>();
+  const items = [];
+
+  for (const s of summary) {
+    const guidance = await WorldDemandService.getPricingGuidance(s.item.id, costMemo);
+    const suggestedSellPriceCents = Math.max(s.bestBid || 0, guidance.suggestedSellPriceCents || 0);
+
+    items.push({
+      ...s,
+      bestBidDollars: s.bestBid ? s.bestBid / 100 : null,
+      bestAskDollars: s.bestAsk ? s.bestAsk / 100 : null,
+      lastPriceDollars: s.lastPrice ? s.lastPrice / 100 : null,
+      treasuryMaxBuyDollars: guidance.treasuryMaxBuyDollars,
+      suggestedSellPriceDollars: suggestedSellPriceCents > 0 ? suggestedSellPriceCents / 100 : null,
+    });
+  }
 
   return c.json({
     success: true,
     data: {
-      items: summary.map(s => ({
-        ...s,
-        bestBidDollars: s.bestBid ? s.bestBid / 100 : null,
-        bestAskDollars: s.bestAsk ? s.bestAsk / 100 : null,
-        lastPriceDollars: s.lastPrice ? s.lastPrice / 100 : null,
-      })),
+      items,
     },
   });
 });

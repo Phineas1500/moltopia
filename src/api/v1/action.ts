@@ -10,10 +10,11 @@ import { AgentStateService } from '../../services/agent-state.service.js';
 import { AgentService } from '../../services/agent.service.js';
 import { LocationService } from '../../services/location.service.js';
 import { BountyService } from '../../services/bounty.service.js';
+import { WorldDemandService } from '../../services/world-demand.service.js';
 import { db } from '../../db/index.js';
 import { presence, inventory, accounts, agentState, agents } from '../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
-import { RECOVERY_WORK_TASKS } from '../../constants/economy.js';
+import { RECOVERY_WORK_TARGET_BALANCE_CENTS, RECOVERY_WORK_TASKS } from '../../constants/economy.js';
 
 // --- Zod schemas for each action's params ---
 
@@ -61,6 +62,10 @@ const marketCancelSchema = z.object({
 const worldWorkSchema = z.object({
   task: z.enum(RECOVERY_WORK_TASKS).optional(),
 });
+
+function sellPriceToleranceCents(targetPriceCents: number) {
+  return Math.max(500, Math.round(targetPriceCents * 0.2));
+}
 
 const tradeProposeSchema = z.object({
   toAgentId: z.string(),
@@ -310,17 +315,63 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
       if (params.price > 10000) {
         throw new Error(`Price $${params.price} is too high. Price is in DOLLARS, not cents. Did you mean $${(params.price / 100).toFixed(2)}?`);
       }
+      const requestedPriceCents = Math.round(params.price * 100);
+      let finalPriceCents = requestedPriceCents;
+      let pricingAdjustment: {
+        requestedPriceDollars: number;
+        finalPriceDollars: number;
+        reason: string;
+      } | null = null;
+
+      const [account, orderBook, guidance] = await Promise.all([
+        EconomyService.getAccount(agentId),
+        MarketService.getOrderBook(params.itemId),
+        WorldDemandService.getPricingGuidance(params.itemId),
+      ]);
+      const bestBidCents = orderBook.bids[0]?.price ?? 0;
+      const quickSellCents = Math.max(bestBidCents, guidance.suggestedSellPriceCents || 0);
+      const lowBalanceSeller = (account?.balance ?? 0) < RECOVERY_WORK_TARGET_BALANCE_CENTS;
+
+      if (lowBalanceSeller && quickSellCents > 0 && requestedPriceCents > quickSellCents) {
+        const tolerance = sellPriceToleranceCents(quickSellCents);
+        if (requestedPriceCents <= quickSellCents + tolerance) {
+          finalPriceCents = quickSellCents;
+          pricingAdjustment = {
+            requestedPriceDollars: requestedPriceCents / 100,
+            finalPriceDollars: finalPriceCents / 100,
+            reason: bestBidCents > 0
+              ? 'Adjusted to the current best bid so this can fill immediately.'
+              : 'Adjusted to the World Treasury fair-buy price so this is eligible for treasury demand.',
+          };
+        } else {
+          throw new Error(
+            `Your balance is low, so price for liquidity. Suggested sell price for this item is $${(quickSellCents / 100).toFixed(2)}. ` +
+            `Your $${(requestedPriceCents / 100).toFixed(2)} ask is too far above likely demand; lower it or wait until you have more cash.`,
+          );
+        }
+      }
+
       const order = await MarketService.placeOrder({
         agentId,
         itemId: params.itemId,
         orderType: 'sell',
-        price: Math.round(params.price * 100),
+        price: finalPriceCents,
         quantity: params.quantity,
       });
 
       await AgentStateService.recordAction(agentId, 'market');
 
-      return { order };
+      return {
+        order,
+        pricing: {
+          requestedPriceDollars: requestedPriceCents / 100,
+          finalPriceDollars: finalPriceCents / 100,
+          bestBidDollars: bestBidCents > 0 ? bestBidCents / 100 : null,
+          treasuryMaxBuyDollars: guidance.treasuryMaxBuyDollars,
+          suggestedSellPriceDollars: quickSellCents > 0 ? quickSellCents / 100 : null,
+          adjusted: pricingAdjustment,
+        },
+      };
     },
   },
 
@@ -523,14 +574,24 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
     isMutating: false,
     handler: async () => {
       const summary = await MarketService.getMarketSummary();
-      return {
-        items: summary.map(s => ({
+      const costMemo = new Map<string, number>();
+      const items = [];
+      for (const s of summary) {
+        const guidance = await WorldDemandService.getPricingGuidance(s.item.id, costMemo);
+        const suggestedSellPriceCents = Math.max(s.bestBid || 0, guidance.suggestedSellPriceCents || 0);
+        items.push({
           item: s.item,
           volume24h: s.volume24h,
           bestBidDollars: s.bestBid ? s.bestBid / 100 : null,
           bestAskDollars: s.bestAsk ? s.bestAsk / 100 : null,
           lastPriceDollars: s.lastPrice ? s.lastPrice / 100 : null,
-        })),
+          treasuryMaxBuyDollars: guidance.treasuryMaxBuyDollars,
+          suggestedSellPriceDollars: suggestedSellPriceCents > 0 ? suggestedSellPriceCents / 100 : null,
+        });
+      }
+
+      return {
+        items,
       };
     },
   },

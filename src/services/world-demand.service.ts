@@ -12,6 +12,8 @@ const MIN_SELL_ORDER_AGE_MS = 15 * 60 * 1000;
 const TREASURY_SPEND_FRACTION = 0.9;
 const LOW_BALANCE_PRIORITY_CENTS = 10000; // $100
 const ONLINE_SELLER_SCORE_BONUS = 20;
+const PRICE_NUDGE_ABSOLUTE_TOLERANCE_CENTS = 500; // $5
+const PRICE_NUDGE_RELATIVE_TOLERANCE = 0.2;
 
 type DemandCandidate = {
   order: typeof marketOrders.$inferSelect & {
@@ -32,6 +34,15 @@ type RunOptions = {
   minOrderAgeMs?: number;
   maxSpendCents?: number;
   reason?: string;
+};
+
+type PriceAdjustment = {
+  orderId: string;
+  agentId: string;
+  itemId: string;
+  itemName: string;
+  oldPriceCents: number;
+  newPriceCents: number;
 };
 
 export const WorldDemandService = {
@@ -59,7 +70,9 @@ export const WorldDemandService = {
       };
     }
 
-    const candidates = await this.getDemandCandidates(options.minOrderAgeMs ?? MIN_SELL_ORDER_AGE_MS);
+    const minOrderAgeMs = options.minOrderAgeMs ?? MIN_SELL_ORDER_AGE_MS;
+    const adjustedOrders = await this.nudgeLowBalanceSellOrders(minOrderAgeMs);
+    const candidates = await this.getDemandCandidates(minOrderAgeMs);
     const maxOrders = options.maxOrders ?? DEFAULT_MAX_ORDERS;
     const createdOrders: Array<{
       orderId: string | null;
@@ -118,6 +131,7 @@ export const WorldDemandService = {
 
     return {
       createdOrders,
+      adjustedOrders,
       spentOrReservedCents,
       skippedReason: createdOrders.length === 0 ? 'no_matching_asks' : null,
     };
@@ -306,16 +320,7 @@ export const WorldDemandService = {
       const existingSystemBid = systemBidByItem.get(order.itemId) ?? 0;
       if (existingSystemBid >= order.price) continue;
 
-      const estimatedCost = await this.estimateCraftCostCents(order.itemId, costMemo);
-      const rarityPremium = order.item.currentSupply <= 3
-        ? 1.8
-        : order.item.currentSupply <= 10
-          ? 1.5
-          : 1.25;
-      const maxAcceptablePrice = Math.min(
-        MAX_UNIT_PRICE_CENTS,
-        Math.max(BASE_ELEMENT_PRICE_CENTS * 2, Math.round(estimatedCost * rarityPremium)),
-      );
+      const maxAcceptablePrice = await this.getMaxAcceptablePriceCents(order.item, costMemo);
 
       if (order.price > maxAcceptablePrice) continue;
 
@@ -339,6 +344,106 @@ export const WorldDemandService = {
 
     candidates.sort((a, b) => b.score - a.score || a.order.price - b.order.price);
     return candidates;
+  },
+
+  async getPricingGuidance(itemId: string, memo = new Map<string, number>()) {
+    const item = await db.query.items.findFirst({
+      where: eq(items.id, itemId),
+    });
+
+    if (!item || item.category !== 'crafted') {
+      return {
+        itemId,
+        treasuryMaxBuyCents: null,
+        treasuryMaxBuyDollars: null,
+        suggestedSellPriceCents: null,
+        suggestedSellPriceDollars: null,
+      };
+    }
+
+    const treasuryMaxBuyCents = await this.getMaxAcceptablePriceCents(item, memo);
+
+    return {
+      itemId,
+      treasuryMaxBuyCents,
+      treasuryMaxBuyDollars: treasuryMaxBuyCents / 100,
+      suggestedSellPriceCents: treasuryMaxBuyCents,
+      suggestedSellPriceDollars: treasuryMaxBuyCents / 100,
+    };
+  },
+
+  async nudgeLowBalanceSellOrders(minOrderAgeMs = MIN_SELL_ORDER_AGE_MS): Promise<PriceAdjustment[]> {
+    const openSells = await db.query.marketOrders.findMany({
+      where: and(
+        eq(marketOrders.orderType, 'sell'),
+        eq(marketOrders.status, 'open'),
+        ne(marketOrders.agentId, SYSTEM_AGENT_ID),
+      ),
+      with: {
+        item: true,
+        agent: {
+          with: {
+            account: true,
+          },
+        },
+      },
+      orderBy: [asc(marketOrders.createdAt)],
+      limit: CANDIDATE_LIMIT,
+    });
+
+    const now = Date.now();
+    const memo = new Map<string, number>();
+    const adjusted: PriceAdjustment[] = [];
+
+    for (const order of openSells) {
+      if (!order.item || order.item.category !== 'crafted') continue;
+      if (order.agent?.status === 'banned') continue;
+      if ((order.quantity - order.filledQuantity) <= 0) continue;
+      if ((order.agent?.account?.balance ?? STARTING_BALANCE_CENTS) >= LOW_BALANCE_PRIORITY_CENTS) continue;
+      if (now - order.createdAt.getTime() < minOrderAgeMs) continue;
+
+      const maxAcceptablePrice = await this.getMaxAcceptablePriceCents(order.item, memo);
+      if (order.price <= maxAcceptablePrice) continue;
+
+      const tolerance = Math.max(
+        PRICE_NUDGE_ABSOLUTE_TOLERANCE_CENTS,
+        Math.round(maxAcceptablePrice * PRICE_NUDGE_RELATIVE_TOLERANCE),
+      );
+      if (order.price > maxAcceptablePrice + tolerance) continue;
+
+      await db
+        .update(marketOrders)
+        .set({ price: maxAcceptablePrice })
+        .where(eq(marketOrders.id, order.id));
+
+      adjusted.push({
+        orderId: order.id,
+        agentId: order.agentId,
+        itemId: order.itemId,
+        itemName: order.item.name,
+        oldPriceCents: order.price,
+        newPriceCents: maxAcceptablePrice,
+      });
+    }
+
+    return adjusted;
+  },
+
+  async getMaxAcceptablePriceCents(
+    item: typeof items.$inferSelect,
+    memo = new Map<string, number>(),
+  ): Promise<number> {
+    const estimatedCost = await this.estimateCraftCostCents(item.id, memo);
+    const rarityPremium = item.currentSupply <= 3
+      ? 1.8
+      : item.currentSupply <= 10
+        ? 1.5
+        : 1.25;
+
+    return Math.min(
+      MAX_UNIT_PRICE_CENTS,
+      Math.max(BASE_ELEMENT_PRICE_CENTS * 2, Math.round(estimatedCost * rarityPremium)),
+    );
   },
 
   async estimateCraftCostCents(
