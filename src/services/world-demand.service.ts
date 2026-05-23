@@ -1,5 +1,5 @@
 import { db } from '../db/index.js';
-import { accounts, items, marketOrders, marketTrades, transactions } from '../db/schema.js';
+import { accounts, inventory, items, marketOrders, marketTrades, transactions } from '../db/schema.js';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { BASE_ELEMENT_PRICE_CENTS, STARTING_BALANCE_CENTS, SYSTEM_AGENT_ID } from '../constants/economy.js';
 import { MarketService } from './market.service.js';
@@ -8,6 +8,7 @@ import { WorldDemandPricingService } from './world-demand-pricing.service.js';
 const CANDIDATE_LIMIT = 200;
 const DEFAULT_MAX_ORDERS = 3;
 const MAX_UNITS_PER_ORDER = 3;
+const MAX_DIRECT_PURCHASE_UNITS_PER_AGENT = 1;
 const MIN_SELL_ORDER_AGE_MS = 15 * 60 * 1000;
 const TREASURY_SPEND_FRACTION = 0.9;
 const LOW_BALANCE_PRIORITY_CENTS = 10000; // $100
@@ -26,6 +27,17 @@ type DemandCandidate = {
   };
   remainingQuantity: number;
   maxAcceptablePrice: number;
+  score: number;
+};
+
+type InventoryDemandCandidate = {
+  inventoryId: string;
+  agentId: string;
+  agentName: string;
+  item: typeof items.$inferSelect;
+  quantityOwned: number;
+  priceCents: number;
+  balanceCents: number;
   score: number;
 };
 
@@ -129,9 +141,64 @@ export const WorldDemandService = {
       }
     }
 
+    const directPurchases: Array<{
+      tradeId: string;
+      buyOrderId: string;
+      sellOrderId: string;
+      agentId: string;
+      agentName: string;
+      itemId: string;
+      itemName: string;
+      priceCents: number;
+      quantity: number;
+    }> = [];
+    const directlyPurchasedAgentIds = new Set<string>();
+
+    if (createdOrders.length < maxOrders && spentOrReservedCents < spendable) {
+      const inventoryCandidates = await this.getInventoryDemandCandidates();
+
+      for (const candidate of inventoryCandidates) {
+        if (createdOrders.length >= maxOrders) break;
+        if (directlyPurchasedAgentIds.has(candidate.agentId)) continue;
+
+        const remainingBudget = spendable - spentOrReservedCents;
+        const quantity = Math.min(
+          candidate.quantityOwned,
+          Math.floor(remainingBudget / candidate.priceCents),
+          MAX_DIRECT_PURCHASE_UNITS_PER_AGENT,
+        );
+
+        if (quantity <= 0) continue;
+
+        try {
+          const purchase = await this.purchaseInventoryCandidate(candidate, quantity);
+          directPurchases.push(purchase);
+          createdOrders.push({
+            orderId: purchase.buyOrderId,
+            itemId: candidate.item.id,
+            itemName: candidate.item.name,
+            priceCents: candidate.priceCents,
+            quantity,
+          });
+          spentOrReservedCents += candidate.priceCents * quantity;
+          directlyPurchasedAgentIds.add(candidate.agentId);
+        } catch (error) {
+          console.error('World demand direct inventory purchase failed:', {
+            reason: options.reason,
+            agentId: candidate.agentId,
+            itemId: candidate.item.id,
+            price: candidate.priceCents,
+            quantity,
+            error,
+          });
+        }
+      }
+    }
+
     return {
       createdOrders,
       adjustedOrders,
+      directPurchases,
       spentOrReservedCents,
       skippedReason: createdOrders.length === 0 ? 'no_matching_asks' : null,
     };
@@ -345,6 +412,208 @@ export const WorldDemandService = {
 
     candidates.sort((a, b) => b.score - a.score || a.order.price - b.order.price);
     return candidates;
+  },
+
+  async getInventoryDemandCandidates(): Promise<InventoryDemandCandidate[]> {
+    const openSells = await db.query.marketOrders.findMany({
+      where: and(
+        eq(marketOrders.orderType, 'sell'),
+        eq(marketOrders.status, 'open'),
+        ne(marketOrders.agentId, SYSTEM_AGENT_ID),
+      ),
+      columns: {
+        agentId: true,
+      },
+    });
+    const agentsWithOpenSells = new Set(openSells.map(order => order.agentId));
+
+    const inventoryRows = await db.query.inventory.findMany({
+      where: sql`${inventory.quantity} > 0`,
+      with: {
+        item: true,
+        agent: {
+          with: {
+            account: true,
+            presence: true,
+          },
+        },
+      },
+      limit: CANDIDATE_LIMIT,
+    });
+
+    const memo = new Map<string, number>();
+    const candidates: InventoryDemandCandidate[] = [];
+
+    for (const row of inventoryRows) {
+      if (!row.item || row.item.category !== 'crafted') continue;
+      if (!row.agent || row.agent.status !== 'active') continue;
+      if (!row.agent.presence) continue;
+      if (agentsWithOpenSells.has(row.agentId)) continue;
+
+      const balanceCents = row.agent.account?.balance ?? STARTING_BALANCE_CENTS;
+      if (balanceCents >= LOW_BALANCE_PRIORITY_CENTS) continue;
+
+      const priceCents = await this.getMaxAcceptablePriceCents(row.item, memo);
+      const scarcityScore = Math.max(0, 20 - row.item.currentSupply);
+      const lowBalanceScore = Math.min(
+        40,
+        Math.max(0, (LOW_BALANCE_PRIORITY_CENTS - balanceCents) / 250),
+      );
+
+      candidates.push({
+        inventoryId: row.id,
+        agentId: row.agentId,
+        agentName: row.agent.name,
+        item: row.item,
+        quantityOwned: row.quantity,
+        priceCents,
+        balanceCents,
+        score: lowBalanceScore + scarcityScore * 0.5 + priceCents / BASE_ELEMENT_PRICE_CENTS,
+      });
+    }
+
+    candidates.sort((a, b) => (
+      b.score - a.score
+      || a.balanceCents - b.balanceCents
+      || a.priceCents - b.priceCents
+    ));
+    return candidates;
+  },
+
+  async purchaseInventoryCandidate(candidate: InventoryDemandCandidate, quantity: number) {
+    const now = new Date();
+    const buyOrderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const sellOrderId = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const tradeId = `trade_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const amount = candidate.priceCents * quantity;
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    return db.transaction(async (tx) => {
+      const [currentInventory] = await tx
+        .select({ quantity: inventory.quantity })
+        .from(inventory)
+        .where(and(
+          eq(inventory.id, candidate.inventoryId),
+          eq(inventory.agentId, candidate.agentId),
+          eq(inventory.itemId, candidate.item.id),
+        ))
+        .limit(1);
+
+      if (!currentInventory || currentInventory.quantity < quantity) {
+        throw new Error(`Insufficient inventory for treasury purchase. Have ${currentInventory?.quantity ?? 0}, need ${quantity}.`);
+      }
+
+      const [sellerAccount] = await tx
+        .select({ balance: accounts.balance })
+        .from(accounts)
+        .where(eq(accounts.agentId, candidate.agentId))
+        .limit(1);
+
+      if (!sellerAccount || sellerAccount.balance >= LOW_BALANCE_PRIORITY_CENTS) {
+        throw new Error('Seller is no longer eligible for low-balance treasury procurement.');
+      }
+
+      const [treasuryDebit] = await tx
+        .update(accounts)
+        .set({
+          balance: sql`${accounts.balance} - ${amount}`,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(accounts.agentId, SYSTEM_AGENT_ID),
+          sql`${accounts.balance} >= ${amount}`,
+        ))
+        .returning({ balance: accounts.balance });
+
+      if (!treasuryDebit) {
+        throw new Error('World Treasury does not have enough funds for inventory procurement right now.');
+      }
+
+      await tx
+        .update(accounts)
+        .set({
+          balance: sql`${accounts.balance} + ${amount}`,
+          updatedAt: now,
+        })
+        .where(eq(accounts.agentId, candidate.agentId));
+
+      if (currentInventory.quantity === quantity) {
+        await tx.delete(inventory).where(eq(inventory.id, candidate.inventoryId));
+      } else {
+        await tx
+          .update(inventory)
+          .set({ quantity: sql`${inventory.quantity} - ${quantity}` })
+          .where(eq(inventory.id, candidate.inventoryId));
+      }
+
+      await tx
+        .update(items)
+        .set({ currentSupply: sql`GREATEST(${items.currentSupply} - ${quantity}, 0)` })
+        .where(eq(items.id, candidate.item.id));
+
+      await tx.insert(marketOrders).values([
+        {
+          id: buyOrderId,
+          agentId: SYSTEM_AGENT_ID,
+          itemId: candidate.item.id,
+          orderType: 'buy',
+          price: candidate.priceCents,
+          quantity,
+          filledQuantity: quantity,
+          status: 'filled',
+          expiresAt,
+          createdAt: now,
+        },
+        {
+          id: sellOrderId,
+          agentId: candidate.agentId,
+          itemId: candidate.item.id,
+          orderType: 'sell',
+          price: candidate.priceCents,
+          quantity,
+          filledQuantity: quantity,
+          status: 'filled',
+          expiresAt,
+          createdAt: now,
+        },
+      ]);
+
+      await tx.insert(marketTrades).values({
+        id: tradeId,
+        itemId: candidate.item.id,
+        buyerId: SYSTEM_AGENT_ID,
+        sellerId: candidate.agentId,
+        price: candidate.priceCents,
+        quantity,
+        buyOrderId,
+        sellOrderId,
+        createdAt: now,
+      });
+
+      await tx.insert(transactions).values({
+        id: `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        fromAgentId: SYSTEM_AGENT_ID,
+        toAgentId: candidate.agentId,
+        amount,
+        type: 'sale',
+        description: `World Treasury inventory procurement of ${quantity}x ${candidate.item.id}`,
+        referenceId: tradeId,
+        referenceType: 'market_trade',
+        createdAt: now,
+      });
+
+      return {
+        tradeId,
+        buyOrderId,
+        sellOrderId,
+        agentId: candidate.agentId,
+        agentName: candidate.agentName,
+        itemId: candidate.item.id,
+        itemName: candidate.item.name,
+        priceCents: candidate.priceCents,
+        quantity,
+      };
+    });
   },
 
   async getPricingGuidance(itemId: string, memo = new Map<string, number>()) {
