@@ -738,7 +738,36 @@ const VALID_ACTIONS = Object.keys(ACTION_HANDLERS);
 
 // --- Reusable action executor (used by both POST /action and heartbeat-embedded actions) ---
 
-export async function executeAction(agentId: string, actionData: { action: string; params?: Record<string, any> }): Promise<{
+type NormalizedActionData = {
+  action: string;
+  params?: Record<string, any>;
+};
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeActionData(actionData: unknown): NormalizedActionData | null {
+  if (!isRecord(actionData)) return null;
+
+  if (typeof actionData.action === 'string') {
+    return {
+      action: actionData.action,
+      params: isRecord(actionData.params) ? actionData.params : undefined,
+    };
+  }
+
+  // Accept common wrapper shapes agents produce after copying heartbeat output:
+  // { command: { action, params } }, { recommendedAction: { command } },
+  // { action: { action, params } }, or the full { action: { type, command } } object.
+  if (isRecord(actionData.command)) return normalizeActionData(actionData.command);
+  if (isRecord(actionData.recommendedAction)) return normalizeActionData(actionData.recommendedAction);
+  if (isRecord(actionData.action)) return normalizeActionData(actionData.action);
+
+  return null;
+}
+
+export async function executeAction(agentId: string, actionData: unknown): Promise<{
   success: boolean;
   action: string;
   result?: any;
@@ -747,7 +776,17 @@ export async function executeAction(agentId: string, actionData: { action: strin
   validActions?: string[];
   moderation?: { reason: string; warningCount: number; banned: boolean; message: string };
 }> {
-  const { action: actionName, params: rawParams } = actionData;
+  const normalizedAction = normalizeActionData(actionData);
+  if (!normalizedAction) {
+    return {
+      success: false,
+      action: 'unknown',
+      error: 'Invalid action format. Expected {"action":"name","params":{...}} or a copied recommendedAction/action.command object.',
+      validActions: VALID_ACTIONS,
+    };
+  }
+
+  const { action: actionName, params: rawParams } = normalizedAction;
 
   const handler = ACTION_HANDLERS[actionName];
   if (!handler) {
@@ -807,11 +846,6 @@ export async function executeAction(agentId: string, actionData: { action: strin
 
 const action = new Hono();
 
-const actionBodySchema = z.object({
-  action: z.string(),
-  params: z.record(z.any()).optional(),
-});
-
 action.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   const agentId = getAgentId(c);
 
@@ -826,16 +860,16 @@ action.post('/', authMiddleware, verifiedMiddleware, async (c) => {
     }, 400);
   }
 
-  const parsed = actionBodySchema.safeParse(body);
-  if (!parsed.success) {
+  const normalizedAction = normalizeActionData(body);
+  if (!normalizedAction) {
     return c.json({
       success: false,
-      error: 'Invalid request format. Expected: {"action": "name", "params": {...}}',
+      error: 'Invalid request format. Expected: {"action": "name", "params": {...}} or a copied recommendedAction/action.command object.',
       validActions: VALID_ACTIONS,
     }, 400);
   }
 
-  const { action: actionName, params: rawParams } = parsed.data;
+  const { action: actionName, params: rawParams } = normalizedAction;
 
   const handler = ACTION_HANDLERS[actionName];
   if (!handler) {
