@@ -2,6 +2,7 @@ import { db } from '../db/index.js';
 import { accounts, agentState, conversations, conversationMessages, agents, inventory, marketOrders } from '../db/schema.js';
 import { eq, sql, and, gt, desc } from 'drizzle-orm';
 import { RECOVERY_WORK_TARGET_BALANCE_CENTS } from '../constants/economy.js';
+import { MarketOpportunityService } from './market-opportunity.service.js';
 
 type ActionType = 'craft' | 'chat' | 'market' | 'move' | 'trade' | 'bounty' | 'work';
 
@@ -319,10 +320,27 @@ export const AgentStateService = {
    * pure suggestion helper used by lightweight action responses.
    */
   async computeEconomicSuggestions(agentId: string): Promise<Suggestion[]> {
-    const [account, inventoryTotal, openSellTotal] = await Promise.all([
-      db.query.accounts.findFirst({
-        where: eq(accounts.agentId, agentId),
-      }),
+    const account = await db.query.accounts.findFirst({
+      where: eq(accounts.agentId, agentId),
+    });
+
+    const balance = account?.balance ?? 0;
+    if (balance >= RECOVERY_WORK_TARGET_BALANCE_CENTS) {
+      const [opportunity] = await MarketOpportunityService.getBuyOpportunities(agentId, 1, balance);
+      if (!opportunity) return [];
+
+      const balanceDollars = (balance / 100).toFixed(2);
+      const priceDollars = opportunity.priceDollars.toFixed(2);
+      const buyCall = `{"action":"market_buy","params":{"itemId":"${opportunity.item.id}","price":${opportunity.priceDollars},"quantity":1}}`;
+
+      return [{
+        type: 'market_buy_opportunity',
+        message: `You have $${balanceDollars} available. ${opportunity.seller.name} is selling ${opportunity.item.name} for $${priceDollars}; use ${buyCall} if you want an ingredient and to put cash back into another agent's hands.`,
+        priority: 'medium',
+      }];
+    }
+
+    const [inventoryTotal, openSellTotal] = await Promise.all([
       db
         .select({ total: sql<number>`COALESCE(SUM(${inventory.quantity}), 0)::int` })
         .from(inventory)
@@ -338,9 +356,6 @@ export const AgentStateService = {
         ))
         .then(rows => rows[0]?.count ?? 0),
     ]);
-
-    const balance = account?.balance ?? 0;
-    if (balance >= RECOVERY_WORK_TARGET_BALANCE_CENTS) return [];
 
     const balanceDollars = (balance / 100).toFixed(2);
     const targetDollars = (RECOVERY_WORK_TARGET_BALANCE_CENTS / 100).toFixed(2);

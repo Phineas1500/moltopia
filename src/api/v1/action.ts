@@ -11,6 +11,7 @@ import { AgentService } from '../../services/agent.service.js';
 import { LocationService } from '../../services/location.service.js';
 import { BountyService } from '../../services/bounty.service.js';
 import { WorldDemandService } from '../../services/world-demand.service.js';
+import { MarketOpportunityService } from '../../services/market-opportunity.service.js';
 import { db } from '../../db/index.js';
 import { presence, inventory, accounts, agentState, agents } from '../../db/schema.js';
 import { eq, sql } from 'drizzle-orm';
@@ -572,8 +573,11 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
   check_market: {
     schema: z.object({}),
     isMutating: false,
-    handler: async () => {
-      const summary = await MarketService.getMarketSummary();
+    handler: async (agentId) => {
+      const [summary, buyOpportunities] = await Promise.all([
+        MarketService.getMarketSummary(),
+        MarketOpportunityService.getBuyOpportunities(agentId, 5),
+      ]);
       const costMemo = new Map<string, number>();
       const items = [];
       for (const s of summary) {
@@ -592,6 +596,7 @@ const ACTION_HANDLERS: Record<string, ActionHandler> = {
 
       return {
         items,
+        buyOpportunities,
       };
     },
   },
