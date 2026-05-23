@@ -23,6 +23,20 @@ interface Suggestion {
   type: string;
   message: string;
   priority: 'low' | 'medium' | 'high';
+  recommendedAction?: {
+    action: string;
+    params: Record<string, unknown>;
+  };
+}
+
+interface RecommendedAction {
+  type: string;
+  priority: Suggestion['priority'];
+  reason: string;
+  command: {
+    action: string;
+    params: Record<string, unknown>;
+  };
 }
 
 export const AgentStateService = {
@@ -157,6 +171,27 @@ export const AgentStateService = {
       .filter(s => !dismissedTypes.has(s.type));
 
     return { state: updatedState, suggestions };
+  },
+
+  getRecommendedAction(suggestions: Suggestion[]): RecommendedAction | null {
+    const priorityRank: Record<Suggestion['priority'], number> = {
+      high: 3,
+      medium: 2,
+      low: 1,
+    };
+
+    const [best] = suggestions
+      .filter((suggestion) => suggestion.recommendedAction)
+      .sort((a, b) => priorityRank[b.priority] - priorityRank[a.priority]);
+
+    if (!best?.recommendedAction) return null;
+
+    return {
+      type: best.type,
+      priority: best.priority,
+      reason: best.message,
+      command: best.recommendedAction,
+    };
   },
 
   /**
@@ -342,6 +377,14 @@ export const AgentStateService = {
         type: 'market_sell_opportunity',
         message: `Your balance is $${balanceDollars}, and you own ${sellOpportunity.item.name}. List 1 for $${priceDollars} with ${sellCall}. ${sellOpportunity.reason}`,
         priority: balance <= RECOVERY_WORK_TARGET_BALANCE_CENTS ? 'high' : 'medium',
+        recommendedAction: {
+          action: 'market_sell',
+          params: {
+            itemId: sellOpportunity.item.id,
+            price: sellOpportunity.suggestedSellPriceDollars,
+            quantity: 1,
+          },
+        },
       }];
     }
 
@@ -357,6 +400,14 @@ export const AgentStateService = {
         type: 'market_buy_opportunity',
         message: `You have $${balanceDollars} available. ${opportunity.seller.name} is selling ${opportunity.item.name} for $${priceDollars}; use ${buyCall} if you want an ingredient and to put cash back into another agent's hands.`,
         priority: 'medium',
+        recommendedAction: {
+          action: 'market_buy',
+          params: {
+            itemId: opportunity.item.id,
+            price: opportunity.priceDollars,
+            quantity: 1,
+          },
+        },
       }];
     }
 
@@ -386,6 +437,10 @@ export const AgentStateService = {
         type: 'low_cash_recovery',
         message: `Your balance is $${balanceDollars}, below the $${targetDollars} needed for craft_elements. You have open sell orders, but if you need immediate cash, use ${workCall} to earn a treasury-funded commission.`,
         priority: 'high',
+        recommendedAction: {
+          action: 'world_work',
+          params: { task: 'market_research' },
+        },
       }];
     }
 
@@ -394,6 +449,10 @@ export const AgentStateService = {
         type: 'low_cash_recovery',
         message: `Your balance is $${balanceDollars}, below the $${targetDollars} needed for craft_elements. Try selling inventory into real bids, or use ${workCall} if you are stuck.`,
         priority: 'high',
+        recommendedAction: {
+          action: 'world_work',
+          params: { task: 'market_research' },
+        },
       }];
     }
 
@@ -401,6 +460,10 @@ export const AgentStateService = {
       type: 'low_cash_recovery',
       message: `Your balance is $${balanceDollars} and you have no sellable inventory. Use ${workCall} to earn enough treasury-funded cash for one craft_elements action.`,
       priority: 'high',
+      recommendedAction: {
+        action: 'world_work',
+        params: { task: 'market_research' },
+      },
     }];
   },
 

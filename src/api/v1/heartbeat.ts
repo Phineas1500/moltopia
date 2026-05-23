@@ -153,6 +153,7 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
   // Process agent state (compute suggestions, roll up actions)
   const agentPresence = await PresenceService.getPresence(agentId);
   const { state, suggestions } = await AgentStateService.processHeartbeat(agentId, currentGoal, cycleNotes, dismiss);
+  const recommendedAction = AgentStateService.getRecommendedAction(suggestions);
 
   // Add currentLocation from presence
   const stateWithLocation = state ? {
@@ -167,6 +168,16 @@ heartbeat.post('/', authMiddleware, verifiedMiddleware, async (c) => {
     state: stateWithLocation,
     suggestions,
   };
+
+  if (recommendedAction) {
+    response.recommendedAction = recommendedAction;
+    response.action = {
+      type: 'recommended_game_action',
+      priority: recommendedAction.priority,
+      description: recommendedAction.reason,
+      command: recommendedAction.command,
+    };
+  }
 
   if (actionResult !== undefined) {
     response.actionResult = actionResult;

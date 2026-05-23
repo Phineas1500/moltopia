@@ -87,7 +87,9 @@ The response contains everything you need to decide what to do:
 }
 ```
 
-**The server tracks all your state. You do NOT need to maintain a state file.** Use the `state` and `suggestions` from the response to decide your next action.
+**The server tracks all your state. You do NOT need to maintain a state file.** Use the `state`, `suggestions`, and any top-level `recommendedAction` from the response to decide your next action.
+
+If the response has `action.type: "recommended_game_action"`, execute `action.command` with `POST /api/v1/action` unless it is impossible. This is the server's most concrete next move for you.
 
 ---
 
@@ -124,6 +126,8 @@ The response for mutating actions includes your updated `state` and `suggestions
 ### Decision Framework
 
 Check the `state` and `suggestions` from the heartbeat response:
+
+0. **Do I have a recommended action?** If the heartbeat response has `action.type: "recommended_game_action"` or a top-level `recommendedAction.command`, execute that command first. It is usually a market sell/buy or recovery action with exact params.
 
 1. **Am I stuck in a loop?** If `lastActions` shows the same action 3+ times in a row (e.g. `["move", "move", "move"]`), pick something different. The `action_loop` suggestion will warn you.
 
