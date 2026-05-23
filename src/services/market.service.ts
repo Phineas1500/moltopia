@@ -1,10 +1,19 @@
 import { db } from '../db/index.js';
 import { marketOrders, marketTrades, items, inventory, accounts, agents, transactions } from '../db/schema.js';
-import { eq, and, or, sql, desc, asc, ne } from 'drizzle-orm';
+import { eq, and, or, sql, desc, asc, ne, lt } from 'drizzle-orm';
 import { PresenceService } from './presence.service.js';
 import { SYSTEM_AGENT_ID } from '../constants/economy.js';
 
 const EXCHANGE_LOCATION_ID = 'loc_exchange';
+const DEFAULT_EXPIRE_ORDER_LIMIT = 250;
+
+type ExpiredOrderResult = {
+  expiredCount: number;
+  buyOrderCount: number;
+  sellOrderCount: number;
+  refundedCents: number;
+  returnedItemCount: number;
+};
 
 export const MarketService = {
   /**
@@ -345,6 +354,113 @@ export const MarketService = {
       .where(eq(marketOrders.id, orderId));
 
     return { success: true };
+  },
+
+  /**
+   * Expire open orders past expiresAt and return whatever was reserved.
+   */
+  async expireExpiredOrders(limit = DEFAULT_EXPIRE_ORDER_LIMIT): Promise<ExpiredOrderResult> {
+    const now = new Date();
+    const expiredOrders = await db.query.marketOrders.findMany({
+      where: and(
+        eq(marketOrders.status, 'open'),
+        lt(marketOrders.expiresAt, now),
+      ),
+      orderBy: [asc(marketOrders.expiresAt)],
+      limit,
+    });
+
+    const result: ExpiredOrderResult = {
+      expiredCount: 0,
+      buyOrderCount: 0,
+      sellOrderCount: 0,
+      refundedCents: 0,
+      returnedItemCount: 0,
+    };
+
+    for (const order of expiredOrders) {
+      const expired = await db.transaction(async (tx) => {
+        const [claimedOrder] = await tx
+          .update(marketOrders)
+          .set({ status: 'expired' })
+          .where(and(
+            eq(marketOrders.id, order.id),
+            eq(marketOrders.status, 'open'),
+            lt(marketOrders.expiresAt, now),
+          ))
+          .returning();
+
+        if (!claimedOrder) return null;
+
+        const remainingQuantity = claimedOrder.quantity - claimedOrder.filledQuantity;
+        if (remainingQuantity <= 0) {
+          return {
+            orderType: claimedOrder.orderType,
+            refundedCents: 0,
+            returnedItemCount: 0,
+          };
+        }
+
+        if (claimedOrder.orderType === 'sell') {
+          const [existingInv] = await tx
+            .select({ id: inventory.id })
+            .from(inventory)
+            .where(and(
+              eq(inventory.agentId, claimedOrder.agentId),
+              eq(inventory.itemId, claimedOrder.itemId),
+            ))
+            .limit(1);
+
+          if (existingInv) {
+            await tx
+              .update(inventory)
+              .set({ quantity: sql`${inventory.quantity} + ${remainingQuantity}` })
+              .where(eq(inventory.id, existingInv.id));
+          } else {
+            await tx.insert(inventory).values({
+              id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              agentId: claimedOrder.agentId,
+              itemId: claimedOrder.itemId,
+              quantity: remainingQuantity,
+            });
+          }
+
+          return {
+            orderType: claimedOrder.orderType,
+            refundedCents: 0,
+            returnedItemCount: remainingQuantity,
+          };
+        }
+
+        const refund = claimedOrder.price * remainingQuantity;
+        await tx
+          .update(accounts)
+          .set({
+            balance: sql`${accounts.balance} + ${refund}`,
+            updatedAt: now,
+          })
+          .where(eq(accounts.agentId, claimedOrder.agentId));
+
+        return {
+          orderType: claimedOrder.orderType,
+          refundedCents: refund,
+          returnedItemCount: 0,
+        };
+      });
+
+      if (!expired) continue;
+
+      result.expiredCount += 1;
+      if (expired.orderType === 'buy') {
+        result.buyOrderCount += 1;
+        result.refundedCents += expired.refundedCents;
+      } else {
+        result.sellOrderCount += 1;
+        result.returnedItemCount += expired.returnedItemCount;
+      }
+    }
+
+    return result;
   },
 
   /**

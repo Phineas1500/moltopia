@@ -8,6 +8,7 @@ import { freeEncoder } from './utils/token-counter.js';
 import { createWebSocketServer, initRedisSubscriber, getConnectedCount } from './api/ws/handler.js';
 import { PresenceService } from './services/presence.service.js';
 import { WorldDemandService } from './services/world-demand.service.js';
+import { MarketService } from './services/market.service.js';
 
 // WebSocket port (HTTP port + 1)
 const WS_PORT = env.PORT + 1;
@@ -42,6 +43,36 @@ setInterval(async () => {
   }
 }, CLEANUP_INTERVAL);
 console.log('🧹 Stale presence cleanup scheduled (every 5 minutes)');
+
+// Market order expiration - returns reserved items/funds for stale orders.
+const ORDER_EXPIRATION_INTERVAL = 5 * 60 * 1000; // 5 minutes
+let orderExpirationRunning = false;
+
+async function runOrderExpirationPass(reason: string) {
+  if (orderExpirationRunning) return;
+  orderExpirationRunning = true;
+
+  try {
+    const result = await MarketService.expireExpiredOrders();
+    if (result.expiredCount > 0) {
+      console.log(
+        `⏳ Expired ${result.expiredCount} market order(s) (${result.sellOrderCount} sell, ${result.buyOrderCount} buy), returned ${result.returnedItemCount} item(s), refunded $${(result.refundedCents / 100).toFixed(2)} [${reason}]`,
+      );
+    }
+  } catch (error) {
+    console.error('❌ Market order expiration pass failed:', error);
+  } finally {
+    orderExpirationRunning = false;
+  }
+}
+
+setTimeout(() => {
+  void runOrderExpirationPass('startup');
+}, 15 * 1000);
+setInterval(() => {
+  void runOrderExpirationPass('scheduler');
+}, ORDER_EXPIRATION_INTERVAL);
+console.log('⏳ Market order expiration scheduled (every 5 minutes)');
 
 // World demand - recirculate treasury money into stale crafted-item asks.
 const WORLD_DEMAND_INTERVAL = 5 * 60 * 1000; // 5 minutes
