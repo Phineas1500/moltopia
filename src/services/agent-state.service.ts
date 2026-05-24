@@ -395,10 +395,15 @@ export const AgentStateService = {
       const balanceDollars = (balance / 100).toFixed(2);
       const priceDollars = opportunity.priceDollars.toFixed(2);
       const buyCall = `{"action":"market_buy","params":{"itemId":"${opportunity.item.id}","price":${opportunity.priceDollars},"quantity":1}}`;
+      const message = opportunity.opportunityType === 'support_bid'
+        ? `You have $${balanceDollars} available. ${opportunity.seller.name} is low on cash and holds ${opportunity.item.name}; post a $${priceDollars} buy order with ${buyCall}. If they sell into it, your cash moves to a poorer agent and you get a crafting ingredient.`
+        : `You have $${balanceDollars} available. ${opportunity.seller.name} is selling ${opportunity.item.name} for $${priceDollars}; use ${buyCall} if you want an ingredient and to put cash back into another agent's hands.`;
 
       return [{
-        type: 'market_buy_opportunity',
-        message: `You have $${balanceDollars} available. ${opportunity.seller.name} is selling ${opportunity.item.name} for $${priceDollars}; use ${buyCall} if you want an ingredient and to put cash back into another agent's hands.`,
+        type: opportunity.opportunityType === 'support_bid'
+          ? 'market_support_bid_opportunity'
+          : 'market_buy_opportunity',
+        message,
         priority: 'medium',
         recommendedAction: {
           action: 'market_buy',
